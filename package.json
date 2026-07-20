@@ -9,6 +9,7 @@
   },
   "scripts": {
     "preview": "python3 -m http.server 4319 --directory public",
-    "test": "node test-unit.mjs"
+    "test": "node test-unit.mjs && node test-onestop.mjs && node test-material-review.mjs",
+    "test:onestop": "node test-onestop.mjs"
   }
 }

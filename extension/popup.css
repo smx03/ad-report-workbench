@@ -1,0 +1,11 @@
+* { box-sizing: border-box; }
+body { width: 310px; margin: 0; color: #17201d; background: #f3f6f4; font-family: "Avenir Next", "PingFang SC", sans-serif; letter-spacing: 0; }
+header { min-height: 68px; padding: 13px 15px; display: flex; align-items: center; gap: 10px; background: #142a22; color: #fff; }
+header > span { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 5px; background: #e6f2ed; color: #174a38; font-weight: 800; }
+header div { display: flex; flex-direction: column; gap: 3px; }
+header strong { font-size: 13px; }
+header small { color: #aec1ba; font-size: 10px; }
+main { padding: 14px; display: grid; gap: 8px; }
+.popup-status { margin-bottom: 3px; padding: 10px; border-left: 3px solid #2b8b66; background: #fff; color: #52605a; font-size: 11px; line-height: 1.55; }
+button { height: 38px; border: 1px solid #164e3b; border-radius: 5px; background: #164e3b; color: #fff; font: 700 12px/1 "Avenir Next", "PingFang SC", sans-serif; cursor: pointer; letter-spacing: 0; }
+button.secondary { border-color: #bfcac5; background: #fff; color: #273a33; }

@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "豆包一站式日期执行器",
+  "version": "0.3.0",
+  "description": "在本机已登录的一站式页面中，预览并执行素材创建时间批量更新。",
+  "permissions": ["tabs", "storage"],
+  "host_permissions": [
+    "https://usergrowth.com.cn/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    "https://smx03.github.io/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "一站式日期执行器",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://127.0.0.1/*",
+        "http://localhost/*",
+        "https://smx03.github.io/ad-report-workbench/*"
+      ],
+      "js": ["dashboard-bridge.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://usergrowth.com.cn/onestop/*"],
+      "js": ["usergrowth-content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
