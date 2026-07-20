@@ -1,5 +1,5 @@
 {
-  "name": "ad-report-automation-workbench",
+  "name": "doubao-report-workbench-static",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -8,10 +8,7 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "start": "node server.mjs",
+    "preview": "python3 -m http.server 4319 --directory public",
     "test": "node test-unit.mjs"
-  },
-  "dependencies": {
-    "exceljs": "4.4.0"
   }
 }

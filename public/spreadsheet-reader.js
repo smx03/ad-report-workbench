@@ -1,8 +1,7 @@
-import ExcelJS from "exceljs";
-
 export async function readWorkbookRows(input) {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(toBuffer(input));
+  if (!globalThis.ExcelJS) throw new Error("Excel解析组件未加载，请刷新页面后重试。");
+  const workbook = new globalThis.ExcelJS.Workbook();
+  await workbook.xlsx.load(input);
   const sheet = workbook.worksheets[0];
   if (!sheet) return { sheetName: "", headers: [], rows: [] };
 
@@ -13,19 +12,11 @@ export async function readWorkbookRows(input) {
     const record = {};
     headers.forEach((header, index) => {
       if (!header) return;
-      const cell = sheet.getCell(rowIndex, index + 1);
-      record[header] = cellValue(cell, header);
+      record[header] = cellValue(sheet.getCell(rowIndex, index + 1), header);
     });
     if (Object.values(record).some((value) => String(value ?? "").trim() !== "")) rows.push(record);
   }
   return { sheetName: sheet.name, headers, rows };
-}
-
-function toBuffer(input) {
-  if (Buffer.isBuffer(input)) return input;
-  if (input instanceof ArrayBuffer) return Buffer.from(input);
-  if (ArrayBuffer.isView(input)) return Buffer.from(input.buffer, input.byteOffset, input.byteLength);
-  throw new TypeError("Unsupported workbook input");
 }
 
 function cellValue(cell, header) {

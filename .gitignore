@@ -1,22 +1,9 @@
 node_modules/
-.env
-.env.*
-!.env.example
 .DS_Store
 *.log
 *.zip
 
-data/*
-!data/.gitkeep
-
-runtime-data/
-
-# 私密业务规则只能通过环境变量或仓库外路径注入
-*.private.json
-*.secret.json
-private-config/
-
-# 仅供当前电脑回归使用，包含本机绝对路径
+# 仅供当前电脑回归使用，包含真实业务文件路径
 test-report.mjs
-test-mapping-store.mjs
-import-initial-mapping.mjs
+test-browser-report.mjs
+test-hourly.mjs
