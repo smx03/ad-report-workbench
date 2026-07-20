@@ -1,0 +1,58 @@
+{
+  "profile": "public-demo",
+  "discountRate": 1,
+  "validation": {
+    "minMappingCoverage": 0.95
+  },
+  "fields": {
+    "account": "账户",
+    "accountId": "账户id",
+    "spend": "消耗",
+    "volume": "转化数",
+    "activation": "激活数",
+    "nextRetained": "次留数",
+    "sevenRetained": "7日留存数",
+    "impressions": "展示数",
+    "clicks": "点击数"
+  },
+  "excludeAccountPatterns": ["demo-excluded"],
+  "deviceInference": [
+    { "value": "终端A", "aliases": ["终端a"], "patterns": ["terminal-a"] },
+    { "value": "终端B", "aliases": ["终端b"], "patterns": ["terminal-b"] }
+  ],
+  "rules": [
+    { "id": "primary_a", "match": { "purpose": "业务一", "alliance": "渠道甲", "reportClass": "类型一", "device": "终端A" } },
+    { "id": "primary_b", "match": { "purpose": "业务一", "alliance": "渠道甲", "reportClass": "类型二", "device": "终端A" } },
+    { "id": "secondary_a", "match": { "purpose": "业务二", "alliance": "渠道乙", "reportClass": "类型一", "device": "终端A" } },
+    { "id": "secondary_b", "match": { "purpose": "业务二", "alliance": "渠道乙", "reportClass": "类型二", "device": "终端A" } }
+  ],
+  "sections": [
+    {
+      "slot": "pull",
+      "title": "业务一",
+      "overallRowId": "primary_overall",
+      "rows": [
+        { "id": "primary_type_a", "channel": "渠道甲", "device": "终端A", "assessment": "类型一", "style": "leaf", "groupIds": ["primary_a"] },
+        { "id": "primary_type_b", "channel": "渠道甲", "device": "终端A", "assessment": "类型二", "style": "leaf", "groupIds": ["primary_b"] },
+        { "id": "primary_overall", "channel": "", "device": "", "assessment": "汇总", "style": "overall", "groupIds": ["primary_a", "primary_b"] }
+      ]
+    },
+    {
+      "slot": "unload",
+      "title": "业务二",
+      "overallRowId": "secondary_overall",
+      "rows": [
+        { "id": "secondary_type_a", "channel": "渠道乙", "device": "终端A", "assessment": "类型一", "style": "leaf", "groupIds": ["secondary_a"] },
+        { "id": "secondary_type_b", "channel": "渠道乙", "device": "终端A", "assessment": "类型二", "style": "leaf", "groupIds": ["secondary_b"] },
+        { "id": "secondary_overall", "channel": "", "device": "", "assessment": "合计", "style": "overall", "groupIds": ["secondary_a", "secondary_b"] }
+      ]
+    }
+  ],
+  "narrative": {
+    "retentionLead": "留存方面",
+    "sections": [
+      { "slot": "pull", "details": [{ "rowId": "primary_type_a", "label": "渠道甲" }] },
+      { "slot": "unload", "details": [{ "rowId": "secondary_type_a", "label": "渠道乙" }] }
+    ]
+  }
+}

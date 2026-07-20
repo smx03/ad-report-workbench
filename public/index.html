@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>广告日报自动化工作台</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-mark" aria-hidden="true">报</div>
+    <div>
+      <h1>广告日报自动化工作台</h1>
+      <p>数据校验、分类聚合、日报出图</p>
+    </div>
+    <div class="topbar-meta"><span class="status-dot"></span>服务运行中</div>
+  </header>
+
+  <main class="workspace">
+    <aside class="rail" aria-label="功能导航">
+      <button class="rail-item active" title="日报生成" aria-label="日报生成">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5zM8 8h8M8 12h8M8 16h5"/></svg>
+      </button>
+      <button class="rail-item" title="时报模块（后续）" aria-label="时报模块" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>
+      </button>
+      <button class="rail-item" title="账户巡检（后续）" aria-label="账户巡检" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9m7 10V5m7 14v-7"/></svg>
+      </button>
+    </aside>
+
+    <section class="content">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">日报生成</div>
+          <h2>上传三日数据，生成可发送日报</h2>
+        </div>
+        <div class="date-field">
+          <label for="report-date">日报日期</label>
+          <input id="report-date" type="date">
+        </div>
+      </div>
+
+      <section class="upload-band" aria-labelledby="upload-title">
+        <div class="section-title-row">
+          <div>
+            <h3 id="upload-title">数据文件</h3>
+            <p>系统按账户ID合并，自动清理ID中的隐藏空格。</p>
+          </div>
+          <button id="load-sample" class="text-button" type="button">查看上传说明</button>
+        </div>
+        <div class="upload-grid">
+          <div class="file-slot" data-key="current">
+            <span class="file-index">D</span>
+            <span class="file-copy"><strong>日报日数据</strong><small data-date-hint="current">日报日基础数据</small></span>
+            <span class="file-state">未选择</span>
+            <div class="file-actions">
+              <label class="file-select" for="file-current">选择文件</label>
+              <button class="file-clear" type="button" data-clear="current" title="删除日报日数据" aria-label="删除日报日数据" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg>
+              </button>
+            </div>
+            <input id="file-current" type="file" accept=".xlsx" hidden>
+          </div>
+          <div class="file-slot" data-key="previous">
+            <span class="file-index">D-1</span>
+            <span class="file-copy"><strong>次留数据</strong><small data-date-hint="previous">前一日激活与次留</small></span>
+            <span class="file-state">未选择</span>
+            <div class="file-actions">
+              <label class="file-select" for="file-previous">选择文件</label>
+              <button class="file-clear" type="button" data-clear="previous" title="删除次留数据" aria-label="删除次留数据" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg>
+              </button>
+            </div>
+            <input id="file-previous" type="file" accept=".xlsx" hidden>
+          </div>
+          <div class="file-slot" data-key="sevenDay">
+            <span class="file-index">D-7</span>
+            <span class="file-copy"><strong>七留数据</strong><small data-date-hint="sevenDay">七日前激活与7日留存</small></span>
+            <span class="file-state">未选择</span>
+            <div class="file-actions">
+              <label class="file-select" for="file-seven-day">选择文件</label>
+              <button class="file-clear" type="button" data-clear="sevenDay" title="删除七留数据" aria-label="删除七留数据" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg>
+              </button>
+            </div>
+            <input id="file-seven-day" type="file" accept=".xlsx" hidden>
+          </div>
+          <div id="mapping-library" class="mapping-library">
+            <span class="file-index">ID</span>
+            <span class="file-copy"><strong>账户分类库</strong><small id="mapping-library-detail">正在读取持久化分类库</small></span>
+            <span id="mapping-library-state" class="file-state">读取中</span>
+            <div class="mapping-actions">
+              <label id="mapping-import-label" class="file-select" for="file-mapping-import">导入最新版匹配表</label>
+              <input id="file-mapping-import" type="file" accept=".xlsx" hidden>
+            </div>
+          </div>
+        </div>
+        <div class="action-row">
+          <div id="upload-summary" class="upload-summary">等待上传3个数据文件</div>
+          <div class="upload-actions">
+            <button id="clear-all-files" class="secondary-button" type="button" disabled>清空全部文件</button>
+            <button id="generate" class="primary-button" type="button" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg>
+              校验并生成日报
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="validation" class="validation-band hidden" aria-live="polite"></section>
+
+      <section id="pending-mappings" class="pending-band hidden" aria-labelledby="pending-title">
+        <div class="pending-head">
+          <div>
+            <div class="eyebrow">待补充分类</div>
+            <h3 id="pending-title">新账户需要确认归属</h3>
+            <p>保存后系统会写入本地分类库，并自动重新生成本次日报。</p>
+          </div>
+          <span id="pending-count" class="pending-count"></span>
+        </div>
+        <div class="pending-table-wrap">
+          <table class="pending-table">
+            <thead><tr><th>账户ID</th><th>账户名称</th><th>推广目的</th><th>联盟分类</th><th>报表分类</th><th>设备</th></tr></thead>
+            <tbody id="pending-mapping-rows"></tbody>
+          </table>
+        </div>
+        <div class="pending-actions">
+          <span>请按账户实际归属填写，避免日报数据进入错误分组。</span>
+          <button id="save-pending-mappings" class="primary-button" type="button">保存分类并重新生成</button>
+        </div>
+      </section>
+
+      <section id="results" class="results hidden">
+        <div class="result-toolbar">
+          <div>
+            <div class="eyebrow">生成结果</div>
+            <h3><span id="result-date"></span> 日报</h3>
+          </div>
+          <div class="toolbar-actions">
+            <button id="download-all" class="secondary-button" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 20h14"/></svg>
+              下载两张日报
+            </button>
+          </div>
+        </div>
+
+        <div class="report-stack">
+          <article class="report-panel">
+            <div class="report-panel-head"><h4 id="pull-report-title">业务一日报</h4><button data-download="pull" class="secondary-button report-download" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 20h14"/></svg>下载图片</button></div>
+            <div id="pull-report" class="report-canvas-wrap"></div>
+          </article>
+          <article class="report-panel">
+            <div class="report-panel-head"><h4 id="unload-report-title">业务二日报</h4><button data-download="unload" class="secondary-button report-download" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 20h14"/></svg>下载图片</button></div>
+            <div id="unload-report" class="report-canvas-wrap"></div>
+          </article>
+        </div>
+
+        <section class="narrative-band">
+          <div class="narrative-head">
+            <div><h3>日报文案</h3><p>数据结论自动生成，实际操作由你勾选。</p></div>
+            <button id="copy-narrative" class="secondary-button" type="button">复制文案</button>
+          </div>
+          <div class="narrative-grid">
+            <div>
+              <label class="field-label" for="narrative">汇报内容</label>
+              <textarea id="narrative" rows="5"></textarea>
+            </div>
+            <div>
+              <span class="field-label">实际操作</span>
+              <div id="action-tags" class="action-tags">
+                <label><input type="checkbox" value="调整异常单元">调整异常单元</label>
+                <label><input type="checkbox" value="优化投放时段">优化投放时段</label>
+                <label><input type="checkbox" value="清理低效消耗">清理低效消耗</label>
+                <label><input type="checkbox" value="调整预算分配">调整预算分配</label>
+                <label><input type="checkbox" value="持续观察指标变化">持续观察指标变化</label>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </section>
+  </main>
+  <dialog id="mapping-import-dialog" class="sync-dialog" aria-labelledby="sync-title">
+    <div class="sync-dialog-head">
+      <div>
+        <div class="eyebrow">完整同步预览</div>
+        <h3 id="sync-title">确认更新账户分类库</h3>
+      </div>
+      <button id="cancel-mapping-import-icon" class="dialog-close" type="button" aria-label="关闭">×</button>
+    </div>
+    <p id="sync-summary" class="sync-summary"></p>
+    <div class="sync-counts" aria-label="同步数量统计">
+      <div><span>当前</span><strong id="sync-current">0</strong></div>
+      <div><span>新表</span><strong id="sync-final">0</strong></div>
+      <div class="positive"><span>新增</span><strong id="sync-inserted">0</strong></div>
+      <div><span>更新</span><strong id="sync-updated">0</strong></div>
+      <div class="negative"><span>删除</span><strong id="sync-deleted">0</strong></div>
+    </div>
+    <div id="sync-delete-warning" class="sync-warning hidden"></div>
+    <div id="sync-change-samples" class="sync-samples"></div>
+    <div class="sync-dialog-actions">
+      <button id="cancel-mapping-import" class="secondary-button" type="button">取消</button>
+      <button id="confirm-mapping-import" class="primary-button" type="button">确认同步</button>
+    </div>
+  </dialog>
+  <datalist id="purpose-options"></datalist>
+  <datalist id="alliance-options"></datalist>
+  <datalist id="report-class-options"></datalist>
+  <datalist id="device-options"></datalist>
+  <div id="toast" class="toast" role="status"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

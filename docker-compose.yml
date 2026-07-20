@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - "4319:4319"
+    environment:
+      NODE_ENV: production
+      APP_USERNAME: ${APP_USERNAME:-admin}
+      APP_PASSWORD: ${APP_PASSWORD:?请先设置APP_PASSWORD}
+      DATA_DIR: /app/data
+      REPORT_CONFIG_BASE64: ${REPORT_CONFIG_BASE64:-}
+      REQUIRE_PRIVATE_CONFIG: ${REQUIRE_PRIVATE_CONFIG:-false}
+    volumes:
+      - ./runtime-data:/app/data
+    restart: unless-stopped

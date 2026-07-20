@@ -1,0 +1,17 @@
+{
+  "name": "ad-report-automation-workbench",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node test-unit.mjs"
+  },
+  "dependencies": {
+    "exceljs": "4.4.0"
+  }
+}

@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: ad-report-workbench
+    runtime: docker
+    plan: starter
+    region: singapore
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data/ad-report-workbench
+      - key: APP_USERNAME
+        value: admin
+      - key: APP_PASSWORD
+        generateValue: true
+      - key: MAX_REQUEST_MB
+        value: 20
+      - key: REQUIRE_PRIVATE_CONFIG
+        value: true
+      - key: REPORT_CONFIG_BASE64
+        sync: false
+    disk:
+      name: ad-report-data
+      mountPath: /var/data
+      sizeGB: 1
