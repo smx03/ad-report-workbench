@@ -3,33 +3,108 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>豆包联盟日报工作台</title>
+  <title>信息流投放工作台</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <header class="topbar">
     <div class="brand-mark" aria-hidden="true">投</div>
     <div>
-      <h1>豆包联盟日报工作台</h1>
-      <p>数据合并、校验、日报出图</p>
+      <h1>信息流投放工作台</h1>
+      <p>素材复盘、数据出图、执行留痕</p>
     </div>
     <div class="topbar-meta"><span class="status-dot"></span>本地安全处理</div>
   </header>
 
   <main class="workspace">
     <aside class="rail" aria-label="功能导航">
-      <button class="rail-item active" data-page="daily" title="日报生成" aria-label="日报生成">
+      <button class="rail-item active" data-page="weekly-material" title="素材周度复盘" aria-label="素材周度复盘">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M8 4v16M8 9h12M8 14h12M8 18h7"/></svg>
+      </button>
+      <button class="rail-item" data-page="daily" title="日报生成" aria-label="日报生成">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5zM8 8h8M8 12h8M8 16h5"/></svg>
       </button>
       <button class="rail-item" data-page="hourly" title="时报生成" aria-label="时报生成">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>
+      </button>
+      <button class="rail-item" data-page="onestop" title="一站式日期维护" aria-label="一站式日期维护">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5.5h14v14H5zM8 3v5m8-5v5M5 10h14M8.5 14h3m-3 3h7"/></svg>
       </button>
       <button class="rail-item" title="账户巡检（后续）" aria-label="账户巡检" disabled>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9m7 10V5m7 14v-7"/></svg>
       </button>
     </aside>
 
-    <section id="daily-page" class="content app-page active">
+    <section id="weekly-material-page" class="content app-page active">
+      <div class="page-head material-page-head">
+        <div>
+          <div class="eyebrow">抖音精选 · 跨部门周度复盘</div>
+          <h2>把投放结果转成下周可拍的素材 Brief</h2>
+          <p class="page-lead">优化师上传一次周表，素材团队直接看到跑量素材、内容共性和下一周生产方向。</p>
+        </div>
+        <div class="material-local-status"><span class="status-dot"></span><div><strong>仅在本机分析</strong><small>原始Excel不上传</small></div></div>
+      </div>
+
+      <section class="material-intake upload-band" aria-labelledby="material-upload-title">
+        <div class="section-title-row">
+          <div><h3 id="material-upload-title">周度素材数据</h3><p>支持你提供的内广、外广周表；系统会自动寻找素材数据页和任务映射页。</p></div>
+          <span class="local-only">本地处理</span>
+        </div>
+        <div class="material-intake-grid">
+          <div id="material-file-slot" class="file-slot material-file-slot">
+            <span class="file-index">XLS</span><span class="file-copy"><strong>抖音精选周度素材表</strong><small>包含素材ID、视频链接、消耗、转化数和次留数</small></span><span id="material-file-state" class="file-state">未选择</span>
+            <div class="file-actions"><label class="file-select" for="material-file">选择文件</label><button id="clear-material-file" class="file-clear" type="button" title="删除周度素材表" aria-label="删除周度素材表" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg></button></div>
+            <input id="material-file" type="file" accept=".xlsx" hidden>
+          </div>
+          <div class="material-rule-panel">
+            <div class="material-rule-head"><strong>复盘口径</strong><span>可按本周实际目标调整</span></div>
+            <div class="material-rule-grid">
+              <label class="control-field"><span>内广目标成本</span><input id="material-target-inner" type="number" min="0" step="1" placeholder="自动基线"></label>
+              <label class="control-field"><span>外广目标成本</span><input id="material-target-outer" type="number" min="0" step="1" placeholder="自动基线"></label>
+              <label class="control-field"><span>最低消耗</span><input id="material-min-spend" type="number" min="0" step="50" value="500"></label>
+              <label class="control-field"><span>最低转化数</span><input id="material-min-conversions" type="number" min="1" step="1" value="10"></label>
+              <label class="control-field material-capacity-field"><span>下周总产能</span><input id="material-weekly-capacity" type="number" min="1" step="1" value="30"><em>条</em></label>
+            </div>
+          </div>
+        </div>
+        <div class="action-row">
+          <div id="material-upload-summary" class="upload-summary">等待上传1个Excel文件</div>
+          <div class="upload-actions"><button id="clear-material-all" class="secondary-button" type="button" disabled>清空</button><button id="generate-material-review" class="primary-button" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg>生成周度复盘</button></div>
+        </div>
+      </section>
+
+      <section id="material-validation" class="validation-band hidden" aria-live="polite"></section>
+
+      <section id="material-results" class="material-results hidden">
+        <div class="material-result-toolbar">
+          <div><div class="eyebrow">复盘结果</div><h3><span id="material-result-week">本周</span> · 从素材表现到创意方向</h3><p id="material-result-source">已读取素材数据</p></div>
+          <div class="toolbar-actions"><button id="copy-material-brief" class="secondary-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="1"/><path d="M5 16V5a1 1 0 0 1 1-1h11"/></svg>复制下周Brief</button><button id="download-material-csv" class="secondary-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 20h14"/></svg>导出素材清单</button></div>
+        </div>
+        <div id="material-kpis" class="material-kpis"></div>
+        <div class="material-segmented" role="tablist" aria-label="复盘视图"><button class="active" data-material-tab="overview" role="tab">周度总览</button><button data-material-tab="materials" role="tab">素材清单</button><button data-material-tab="brief" role="tab">下周创意Brief</button></div>
+
+        <section id="material-overview-panel" class="material-panel" data-material-panel="overview">
+          <div class="material-panel-grid">
+            <article class="material-section"><div class="material-section-head"><div><div class="eyebrow">Content signals</div><h4>内容方向表现</h4></div><span class="section-note">依据标题、标签与数据表现</span></div><div id="material-direction-list" class="direction-list"></div></article>
+            <article class="material-section"><div class="material-section-head"><div><div class="eyebrow">Top evidence</div><h4>本周重点素材</h4></div><span class="section-note">先看能复制的证据</span></div><div id="material-top-list" class="material-top-list"></div></article>
+          </div>
+          <div class="material-section material-insight-section"><div class="material-section-head"><div><div class="eyebrow">Weekly readout</div><h4>跨部门共同结论</h4></div><span class="section-note">优化师与素材团队使用同一口径</span></div><div id="material-insight-copy" class="insight-copy"></div></div>
+        </section>
+
+        <section id="material-materials-panel" class="material-panel hidden" data-material-panel="materials">
+          <div class="material-panel-headline"><div><div class="eyebrow">Material ledger</div><h4>素材执行清单</h4><p>点击任意素材查看数据、标题语义、参考链接和推断边界。</p></div><div class="material-filters"><label class="search-field"><span>搜索</span><input id="material-search" type="search" placeholder="素材ID、标题或任务"></label><label class="select-field"><span>版位</span><select id="material-placement-filter"><option value="全部">全部版位</option><option value="内广">内广</option><option value="外广">外广</option></select></label><label class="select-field"><span>分层</span><select id="material-status-filter"><option value="全部">全部分层</option><option value="跑量优质">跑量优质</option><option value="跑量待优化">跑量待优化</option><option value="高效潜力">高效潜力</option><option value="稳态观察">稳态观察</option><option value="低效观察">低效观察</option><option value="数据不足">数据不足</option></select></label></div></div>
+          <div class="material-table-wrap"><table class="material-table"><thead><tr><th>素材 / 标题</th><th>版位</th><th>消耗</th><th>转化</th><th>成本</th><th>次留率</th><th>内容方向</th><th>周度结论</th></tr></thead><tbody id="material-table-body"></tbody></table></div>
+        </section>
+
+        <section id="material-brief-panel" class="material-panel hidden" data-material-panel="brief">
+          <div class="brief-panel-head"><div><div class="eyebrow">Next week production plan</div><h4>下周创意 Brief</h4><p>数量会与“下周总产能”一致；每一条方向都带有本周素材证据。</p></div><div id="material-brief-capacity" class="brief-capacity"></div></div>
+          <div id="material-brief-list" class="brief-list"></div>
+          <div class="brief-boundary"><strong>推断边界</strong><span>当前数据能判断标题/标签语义、任务类型和投放结果；前三秒画面、口播语气、字幕节奏需要接入视频文件或优量素材链接后再自动拆解。</span></div>
+        </section>
+      </section>
+    </section>
+
+    <section id="daily-page" class="content app-page hidden">
       <div class="page-head">
         <div>
           <div class="eyebrow">日报生成</div>
@@ -197,11 +272,111 @@
         </div>
       </section>
     </section>
+
+    <section id="onestop-page" class="content app-page hidden">
+      <div class="page-head onestop-page-head">
+        <div>
+          <div class="eyebrow">一站式日期维护</div>
+          <h2>把重复改日期，变成一张可确认的执行清单</h2>
+        </div>
+        <div id="extension-state" class="extension-state checking" role="status">
+          <span class="connection-light"></span>
+          <span><strong>正在检测执行扩展</strong><small>网页只负责预览和确认</small></span>
+        </div>
+      </div>
+
+      <section class="onestop-overview" aria-label="今日维护摘要">
+        <div><span>任务总数</span><strong id="onestop-total">0</strong><small>本机已保存</small></div>
+        <div><span>待更新</span><strong id="onestop-pending">-</strong><small>预览后确定</small></div>
+        <div><span>已是今日</span><strong id="onestop-skipped">-</strong><small>自动跳过</small></div>
+        <div><span>最近执行</span><strong id="onestop-last-run">--</strong><small>仅保存执行日志</small></div>
+      </section>
+
+      <section class="onestop-config-band">
+        <div class="section-title-row">
+          <div><h3>执行范围</h3><p>按上方设定更新素材创建时间；默认为当年6月1日到今天。</p></div>
+          <button id="open-onestop" class="secondary-button" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M18 13v6H5V6h6"/></svg>
+            打开一站式
+          </button>
+        </div>
+        <div class="onestop-config-grid">
+          <label class="control-field wide"><span>任务列表地址</span><input id="onestop-list-url" type="url" spellcheck="false" value="https://usergrowth.com.cn/onestop/ad/ad_create?_app_id=482431&amp;ad_platform=toutiao&amp;owners[]=854784967720715__ps574347"></label>
+          <label class="control-field"><span>开始日期</span><input id="onestop-start-date" type="date"></label>
+          <label class="control-field"><span>目标结束日期</span><input id="onestop-end-date" type="date"></label>
+        </div>
+        <div class="task-source-grid">
+          <div class="task-input-panel">
+            <div class="task-input-head"><label for="onestop-task-input">任务ID清单</label><span id="task-input-count">0 条</span></div>
+            <textarea id="onestop-task-input" rows="8" spellcheck="false" placeholder="每行一条：48603528 雪-dsp2-and-每留-素材监控"></textarea>
+            <div class="task-input-actions">
+              <button id="scan-onestop-tasks" class="secondary-button" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10m4-2 2 2-2 2"/></svg>
+                扫描全部分页
+              </button>
+              <button id="save-onestop-tasks" class="secondary-button" type="button">保存清单</button>
+              <button id="clear-onestop-tasks" class="text-button danger-text" type="button">清空</button>
+            </div>
+          </div>
+          <div class="safety-panel">
+            <div class="safety-mark" aria-hidden="true">审</div>
+            <div><strong>人工确认后才提交</strong><p>扫描和预览不会修改任务。执行时逐条打开编辑页，只改素材创建时间；登录失效或控件异常立即停止。</p></div>
+            <ul><li>已是目标日期自动跳过</li><li>任务名称与ID同时展示</li><li>失败任务可单独重试</li></ul>
+          </div>
+        </div>
+        <div class="action-row">
+          <div id="onestop-config-summary" class="upload-summary">先连接Chrome扩展，再扫描或粘贴任务ID。</div>
+          <button id="preview-onestop" class="primary-button" type="button" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.5"/></svg>
+            生成更新预览
+          </button>
+        </div>
+      </section>
+
+      <section id="onestop-preview" class="onestop-preview hidden" aria-live="polite">
+        <div class="preview-toolbar">
+          <div><div class="eyebrow">执行前确认</div><h3>素材日期更新清单</h3><p id="onestop-preview-summary">正在读取任务。</p></div>
+          <div class="preview-legend"><span class="status-chip pending">待更新</span><span class="status-chip skipped">无需更新</span><span class="status-chip failed">读取失败</span></div>
+        </div>
+        <div class="onestop-table-wrap">
+          <table class="onestop-table">
+            <thead><tr><th class="select-cell"><input id="select-all-onestop" type="checkbox" aria-label="全选待更新任务"></th><th>任务</th><th>当前区间</th><th>目标区间</th><th>状态</th><th>执行结果</th></tr></thead>
+            <tbody id="onestop-task-rows"></tbody>
+          </table>
+        </div>
+        <div class="onestop-runbar">
+          <div class="run-progress-copy"><strong id="run-progress-title">等待确认</strong><span id="run-progress-detail">勾选需要更新的任务后执行</span></div>
+          <div class="run-progress-track" aria-hidden="true"><span id="run-progress-bar"></span></div>
+          <button id="retry-onestop" class="secondary-button hidden" type="button">重试失败项</button>
+          <button id="execute-onestop" class="primary-button danger-action" type="button" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 12.5 10.2 16 17 8M12 3l8 3v6c0 4.8-3.2 7.7-8 9-4.8-1.3-8-4.2-8-9V6z"/></svg>
+            确认并批量更新
+          </button>
+        </div>
+      </section>
+    </section>
   </main>
+  <dialog id="material-detail-dialog" class="material-detail-dialog">
+    <div class="material-detail-head"><div><div class="eyebrow">素材证据</div><h3 id="material-detail-id">素材详情</h3></div><button class="dialog-close" type="button" data-close-material-dialog aria-label="关闭">&times;</button></div>
+    <div id="material-detail-body" class="material-detail-body"></div>
+    <div class="material-detail-actions"><button class="secondary-button" type="button" data-close-material-dialog>关闭</button><a id="material-detail-link" class="primary-button material-link-button" href="#" target="_blank" rel="noreferrer">打开视频链接<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M18 13v6H5V6h6"/></svg></a></div>
+  </dialog>
+  <dialog id="onestop-confirm-dialog" class="confirm-dialog">
+    <div class="confirm-dialog-head"><div><div class="eyebrow">即将写入一站式</div><h3>确认批量更新</h3></div><button class="dialog-close" type="button" data-close-onestop-dialog aria-label="关闭">&times;</button></div>
+    <div class="confirm-dialog-body">
+      <p id="onestop-confirm-copy"></p>
+      <div class="confirm-scope"><span>修改字段</span><strong>广告统一配置 · 素材创建时间</strong></div>
+      <label class="confirm-check"><input id="onestop-confirm-check" type="checkbox"><span>我已核对任务清单和目标日期</span></label>
+    </div>
+    <div class="confirm-dialog-actions"><button class="secondary-button" type="button" data-close-onestop-dialog>返回检查</button><button id="confirm-execute-onestop" class="primary-button danger-action" type="button" disabled>开始逐条更新</button></div>
+  </dialog>
   <div id="toast" class="toast" role="status"></div>
+  <script src="./vendor/jszip.min.js"></script>
   <script src="./vendor/exceljs.min.js"></script>
-  <script type="module" src="./navigation.js?v=20260720-3"></script>
-  <script type="module" src="./app.js?v=20260720-3"></script>
+  <script type="module" src="./navigation.js?v=20260720-5"></script>
+  <script type="module" src="./material-review-app.js?v=20260720-1"></script>
+  <script type="module" src="./app.js?v=20260720-4"></script>
   <script type="module" src="./hourly-app.js?v=20260720-10"></script>
+  <script type="module" src="./onestop-app.js?v=20260720-1"></script>
 </body>
 </html>
