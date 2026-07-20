@@ -84,7 +84,7 @@ function metricsFromPeriods(current, previousComparable, previousFull, twoDaysFu
     discountCost,
     costChange: ratioChange(discountCost, previousDiscountCost),
     realtimeRetention,
-    retentionChange: ratioChange(realtimeRetention, comparisonRetention),
+    retentionChange: realtimeRetention != null && comparisonRetention != null ? realtimeRetention - comparisonRetention : null,
     ctr: divide(current.clicks, current.impressions),
     conversionRate: divide(current.activations, current.clicks),
     periods: { current, previousComparable, previousFull, twoDaysFull, twoDaysRetentionComparable },

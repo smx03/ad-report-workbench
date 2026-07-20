@@ -29,8 +29,8 @@ function testDailyReport() {
 
 function testHourlyReport() {
   const rows = [];
-  for (const [date, spend, activations] of [["2026-07-18", 80, 8], ["2026-07-19", 100, 10], ["2026-07-20", 120, 12]]) {
-    rows.push({ "时间-天": date, "时间-小时": `${date} 10:00:00`, "备注": "穿山甲-and-每留", "消耗": spend, "激活数": activations, "展示数": 1000, "点击数": 100, "次留数": 4 });
+  for (const [date, spend, activations, retained] of [["2026-07-18", 80, 8, 2], ["2026-07-19", 100, 10, 3], ["2026-07-20", 120, 12, 0]]) {
+    rows.push({ "时间-天": date, "时间-小时": `${date} 10:00:00`, "备注": "穿山甲-and-每留", "消耗": spend, "激活数": activations, "展示数": 1000, "点击数": 100, "次留数": retained });
   }
   const report = buildHourlyReports(rows, "2026-07-20", 18);
   const pull = report.pull.rows.find((row) => row.style === "overall").metrics;
@@ -38,6 +38,7 @@ function testHourlyReport() {
   assert.equal(pull.volume, 12);
   assert.equal(pull.discountSpend, 96);
   assert.ok(Math.abs(pull.volumeChange - 0.2) < 1e-12);
+  assert.ok(Math.abs(pull.retentionChange - 0.05) < 1e-12);
 }
 
 function source(rows) { return { sheetName: "数据", headers: ["账户", "账户id", "消耗", "转化数", "激活数", "次留数", "7日留存数", "展示数", "点击数"], rows }; }
