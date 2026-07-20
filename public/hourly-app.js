@@ -1,4 +1,4 @@
-import { assertHourlyHeaders, availableHourlyDates, buildHourlyReports } from "./hourly-engine.js";
+import { assertHourlyHeaders, availableHourlyDates, buildHourlyReports } from "./hourly-engine.js?v=20260720-3";
 
 const state = { file: null, rows: [], report: null };
 const input = document.querySelector("#hourly-file");
@@ -19,6 +19,15 @@ async function readWorkbook() {
   const file = input.files[0];
   if (!file) return;
   const label = slot.querySelector(".file-select");
+  state.file = null;
+  state.rows = [];
+  state.report = null;
+  generateButton.disabled = true;
+  results.classList.add("hidden");
+  slot.classList.remove("ready");
+  slot.querySelector(".file-state").textContent = file.name;
+  slot.querySelector("#clear-hourly-file").disabled = false;
+  document.querySelector("#hourly-upload-summary").textContent = "正在读取并校验Excel，请稍候…";
   label.textContent = "正在读取";
   label.classList.add("loading");
   try {
@@ -49,8 +58,15 @@ async function readWorkbook() {
     label.textContent = "替换文件";
     resetResult();
   } catch (error) {
+    state.file = null;
+    state.rows = [];
+    slot.classList.remove("ready");
+    slot.querySelector(".file-state").textContent = "读取失败，请重新选择";
+    slot.querySelector("#clear-hourly-file").disabled = false;
+    document.querySelector("#hourly-upload-summary").textContent = "文件未通过校验，无法生成时报";
+    generateButton.disabled = true;
     showValidation("error", "文件读取失败", error.message);
-    label.textContent = state.file ? "替换文件" : "选择文件";
+    label.textContent = "重新选择";
   } finally {
     label.classList.remove("loading");
     input.value = "";
@@ -146,22 +162,62 @@ function formatDate(value) { const [, month, day] = value.split("-"); return `${
 function pad(value) { return String(value).padStart(2, "0"); }
 function escapeHtml(value) { return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]); }
 function toast(message, duration = 2200) { const node = document.querySelector("#toast"); node.textContent = message; node.classList.add("show"); clearTimeout(toast.timer); toast.timer = setTimeout(() => node.classList.remove("show"), duration); }
-function saveBlob(blob, filename) { const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+function saveBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 async function tableToPng(table) {
   await document.fonts.ready;
-  const rect = table.getBoundingClientRect();
-  const width = Math.ceil(Math.max(table.scrollWidth, rect.width));
-  const height = Math.ceil(Math.max(table.scrollHeight, rect.height));
-  const clone = table.cloneNode(true);
-  clone.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
-  const style = document.createElement("style");
-  style.textContent = `.hourly-report{width:${width}px;table-layout:fixed;border-collapse:collapse;background:#fff;font-family:"PingFang SC","Microsoft YaHei",sans-serif;font-size:12px;color:#17211d}.hourly-report th,.hourly-report td{height:28px;padding:3px 5px;border:1px solid #222;text-align:center;white-space:nowrap}.hourly-report th{background:#b8caf4;font-weight:500}.hourly-report.unload th{background:#8edc83}.hourly-report th.report-kind{color:#ed5151;font-weight:700}.hourly-report td.channel{font-weight:700}.hourly-report tr.device-summary td{background:#fff366;font-weight:700}.hourly-report.unload tr.device-summary td{background:#d5efd1}.hourly-report tr.channel-total td,.hourly-report tr.overall td{font-weight:700}.hourly-report.pull tr.overall td{background:#dce5fa}.hourly-report.unload tr.overall td{background:#f7f8f7}`;
-  const wrapper = document.createElement("div"); wrapper.setAttribute("xmlns", "http://www.w3.org/1999/xhtml"); wrapper.style.background = "white"; wrapper.append(style, clone);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${new XMLSerializer().serializeToString(wrapper)}</foreignObject></svg>`;
-  const image = new Image(); const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
-  await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = () => reject(new Error("图片渲染失败")); image.src = url; });
-  const scale = 2; const canvas = document.createElement("canvas"); canvas.width = width * scale; canvas.height = height * scale;
-  const context = canvas.getContext("2d"); context.scale(scale, scale); context.fillStyle = "#fff"; context.fillRect(0, 0, width, height); context.drawImage(image, 0, 0); URL.revokeObjectURL(url);
+  const tableRect = table.getBoundingClientRect();
+  const width = Math.ceil(tableRect.width);
+  const height = Math.ceil(tableRect.height);
+  const scale = 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  const context = canvas.getContext("2d");
+  context.scale(scale, scale);
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, width, height);
+  const cells = [...table.querySelectorAll("th, td")];
+  for (const cell of cells) {
+    const rect = cell.getBoundingClientRect();
+    const style = getComputedStyle(cell);
+    context.fillStyle = transparent(style.backgroundColor) ? "#ffffff" : style.backgroundColor;
+    context.fillRect(rect.left - tableRect.left, rect.top - tableRect.top, rect.width, rect.height);
+  }
+  context.strokeStyle = "#222222";
+  context.lineWidth = 1;
+  for (const cell of cells) {
+    const rect = cell.getBoundingClientRect();
+    context.strokeRect(Math.round(rect.left - tableRect.left) + 0.5, Math.round(rect.top - tableRect.top) + 0.5, Math.max(0, Math.round(rect.width) - 1), Math.max(0, Math.round(rect.height) - 1));
+  }
+  for (const cell of cells) {
+    const rect = cell.getBoundingClientRect();
+    const style = getComputedStyle(cell);
+    const text = cell.textContent.trim();
+    let fontSize = Number.parseFloat(style.fontSize) || 12;
+    const fontWeight = style.fontWeight || "400";
+    const fontFamily = style.fontFamily || '"PingFang SC", sans-serif';
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillStyle = style.color || "#17201d";
+    context.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+    const availableWidth = Math.max(8, rect.width - 10);
+    while (fontSize > 8 && context.measureText(text).width > availableWidth) {
+      fontSize -= 0.5;
+      context.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+    }
+    context.fillText(text, rect.left - tableRect.left + rect.width / 2, rect.top - tableRect.top + rect.height / 2, availableWidth);
+  }
   return await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("PNG生成失败")), "image/png"));
 }
+
+function transparent(color) { return !color || color === "transparent" || color === "rgba(0, 0, 0, 0)"; }

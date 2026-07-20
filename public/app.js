@@ -1,11 +1,11 @@
-import { generateDailyReport } from "./report-engine.js";
-import { REPORT_CONFIG } from "./report-config.js";
-import { readWorkbookRows } from "./spreadsheet-reader.js";
+import { generateDailyReport } from "./report-engine.js?v=20260720-3";
+import { REPORT_CONFIG } from "./report-config.js?v=20260720-3";
+import { readWorkbookRows } from "./spreadsheet-reader.js?v=20260720-3";
 
 const REQUIRED_FILES = ["current", "previous", "sevenDay", "mapping"];
 const HISTORY_KEY = "doubao-report-retention-history-v1";
 const state = { files: {}, report: null, baseNarrative: "" };
-const fileSlots = [...document.querySelectorAll(".file-slot")];
+const fileSlots = [...document.querySelectorAll("#daily-page .file-slot[data-key]")];
 const generateButton = document.querySelector("#generate");
 const uploadSummary = document.querySelector("#upload-summary");
 const validation = document.querySelector("#validation");
@@ -41,7 +41,7 @@ fileSlots.forEach((slot) => {
   });
 });
 
-document.querySelectorAll(".file-clear").forEach((button) => {
+document.querySelectorAll("#daily-page .file-clear[data-clear]").forEach((button) => {
   button.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();

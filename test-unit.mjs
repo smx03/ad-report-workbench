@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { buildHourlyReports } from "./public/hourly-engine.js";
 import { generateDailyReport } from "./public/report-engine.js";
 import { REPORT_CONFIG } from "./public/report-config.js";
+import fs from "node:fs";
 
 testDailyReport();
 testHourlyReport();
+testUploadListenerIsolation();
 console.log("纯前端单元测试通过");
 
 function testDailyReport() {
@@ -39,6 +41,12 @@ function testHourlyReport() {
   assert.equal(pull.discountSpend, 96);
   assert.ok(Math.abs(pull.volumeChange - 0.2) < 1e-12);
   assert.ok(Math.abs(pull.retentionChange - 0.05) < 1e-12);
+}
+
+function testUploadListenerIsolation() {
+  const dailyApp = fs.readFileSync(new URL("./public/app.js", import.meta.url), "utf8");
+  assert.match(dailyApp, /#daily-page \.file-slot\[data-key\]/);
+  assert.match(dailyApp, /#daily-page \.file-clear\[data-clear\]/);
 }
 
 function source(rows) { return { sheetName: "数据", headers: ["账户", "账户id", "消耗", "转化数", "激活数", "次留数", "7日留存数", "展示数", "点击数"], rows }; }
