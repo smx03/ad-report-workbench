@@ -59,8 +59,9 @@ function testHourlyReport() {
     { "时间-天": new Date("2026-07-18T00:00:00Z"), "时间-小时": new Date("2026-07-18T19:00:00Z"), "备注": "穿山甲-and-每留", "消耗": 80, "激活数": 8, "展示数": 100, "点击数": 10, "次留数": 2 },
     { "时间-天": new Date("2026-07-19T00:00:00Z"), "时间-小时": new Date("2026-07-19T19:00:00Z"), "备注": "穿山甲-and-每留", "消耗": 100, "激活数": 10, "展示数": 100, "点击数": 10, "次留数": 3 },
     { "时间-天": new Date("2026-07-20T00:00:00Z"), "时间-小时": new Date("2026-07-20T19:00:00Z"), "备注": "穿山甲-and-每留", "消耗": 120, "激活数": 12, "展示数": 100, "点击数": 10, "次留数": 0 },
+    { "时间-天": new Date("2026-07-20T00:00:00Z"), "时间-小时": new Date("2026-07-20T21:00:00Z"), "备注": "穿山甲-and-每留", "消耗": 30, "激活数": 3, "展示数": 30, "点击数": 3, "次留数": 0 },
   ];
-  assert.equal(buildHourlyReports(dateRows, "2026-07-20", 20).pull.rows.at(-1).metrics.spend, 120);
+  assert.equal(buildHourlyReports(dateRows, "2026-07-20", 20).pull.rows.at(-1).metrics.spend, 150);
   assert.equal(buildHourlyReports(dateRows, "2026-07-20", 20).unload.rows.length, 7);
 }
 
@@ -74,12 +75,18 @@ function testHourlyHistory() {
   assert.equal(snapshot.unload.rows.length, 7);
   assert.equal(snapshot.pull.rows[0].metrics.volume, 100);
   assert.equal(snapshot.unload.rows.at(-1).metrics.volume, 206);
-  const fallback = findComparisonSnapshot({
+  const nightFallback = findComparisonSnapshot({
+    "2026-07-19|15": snapshot,
     "2026-07-19|18": snapshot,
     "2026-07-19|21": snapshot,
   }, "2026-07-19", 20);
-  assert.equal(fallback.hour, 21);
-  assert.equal(fallback.exact, false);
+  assert.equal(nightFallback.hour, 21);
+  assert.equal(nightFallback.exact, false);
+  const noCrossBatchFallback = findComparisonSnapshot({
+    "2026-07-19|15": snapshot,
+    "2026-07-19|22": snapshot,
+  }, "2026-07-19", 18);
+  assert.equal(noCrossBatchFallback, null);
 }
 
 function testUploadListenerIsolation() {

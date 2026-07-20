@@ -1,5 +1,5 @@
-import { assertHourlyHeaders, availableHourlyDates, buildHourlyReports } from "./hourly-engine.js?v=20260720-8";
-import { extractHourlyHistory, findComparisonSnapshot, historyKey, snapshotFromReport } from "./hourly-history.js?v=20260720-6";
+import { assertHourlyHeaders, availableHourlyDates, buildHourlyReports } from "./hourly-engine.js?v=20260720-9";
+import { extractHourlyHistory, findComparisonSnapshot, historyKey, reportBatchForHour, snapshotFromReport } from "./hourly-history.js?v=20260720-7";
 
 const HISTORY_KEY = "doubao-hourly-snapshots-v1";
 const state = { file: null, rows: [], report: null, history: readHistory() };
@@ -51,7 +51,7 @@ async function readWorkbook() {
       if (Object.values(record).some((value) => value !== null && value !== "")) rows.push(record);
     });
     const dates = availableHourlyDates(rows);
-    if (dates.length < 3) throw new Error("源表至少需要包含今天、昨天和前天三天数据");
+    if (dates.length < 2) throw new Error("源表至少需要包含今天和昨天两天数据");
     state.file = file;
     state.rows = rows;
     dateInput.value = dates.at(-1);
@@ -85,7 +85,10 @@ function generate() {
   try {
     const cutoffHour = Number(hourSelect.value);
     const previousDate = shiftDate(dateInput.value, -1);
+    const batch = reportBatchForHour(cutoffHour);
+    if (!batch) throw new Error("请选择有效的时报批次");
     const comparison = findComparisonSnapshot(state.history, previousDate, cutoffHour);
+    if (!comparison) throw new Error(`${formatDate(previousDate)}缺少${batch.label}历史时报（${batch.hours.map((hour) => `${hour}:00`).join("或")}），请先更新历史基准。`);
     const report = buildHourlyReports(state.rows, dateInput.value, cutoffHour, comparison?.snapshot ?? null);
     state.report = report;
     state.history[historyKey(report.reportDate, report.cutoffHour)] = snapshotFromReport(report);
@@ -97,10 +100,8 @@ function generate() {
     document.querySelector("#hourly-result-date").textContent = label;
     document.querySelector("#hourly-pull-title").textContent = `${label} 拉新时报`;
     document.querySelector("#hourly-unload-title").textContent = `${label} 卸载时报`;
-    const comparisonText = comparison
-      ? `三项环比使用${formatDate(previousDate)} ${pad(comparison.hour)}:00历史时报快照${comparison.exact ? "" : "（前一天无同一时刻，已自动取最接近时刻）"}。`
-      : `未找到${formatDate(previousDate)} ${pad(report.cutoffHour)}:00历史时报，三项环比暂按源表回算；导入历史时报基准后可与手工表对齐。`;
-    showValidation(comparison ? "success" : "warning", comparison ? "校验通过" : "已生成，缺少历史基准", `已读取${report.sourceRows.toLocaleString("zh-CN")}行。${comparisonText}`);
+    const comparisonText = `当前值使用导出表中${formatDate(report.reportDate)}的全部已有数据；三项环比使用${formatDate(previousDate)} ${pad(comparison.hour)}:00历史时报${comparison.exact ? "" : "（同批次最接近时刻）"}。`;
+    showValidation("success", "校验通过", `已读取${report.sourceRows.toLocaleString("zh-CN")}行。${comparisonText}`);
     results.classList.remove("hidden");
     results.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
@@ -165,7 +166,7 @@ function renderHistoryStatus() {
   const slot = document.querySelector("#hourly-history-slot");
   if (count) {
     slot.classList.add("ready");
-    if (slot.querySelector(".file-state").textContent === "尚未导入") slot.querySelector(".file-state").textContent = `已保存${count}个快照`;
+    slot.querySelector(".file-state").textContent = `已保存${count}个快照`;
     slot.querySelector("#clear-hourly-history").disabled = false;
     slot.querySelector(".file-select").textContent = "更新历史基准";
   }

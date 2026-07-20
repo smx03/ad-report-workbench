@@ -1,4 +1,9 @@
 const SHEETS = { pull: "时报拉新-2606", unload: "时报卸载-2606" };
+const REPORT_BATCHES = [
+  { id: "morning", label: "第一批", hours: [11, 12] },
+  { id: "evening", label: "第二批", hours: [18, 19] },
+  { id: "night", label: "第三批", hours: [20, 21, 22] },
+];
 const LAYOUT = {
   pull: [
     row("dsp1", "and", "每留"), row("dsp1", "and", "七留"), row("dsp1", "and", "汇总"),
@@ -36,17 +41,21 @@ export function snapshotFromReport(report) {
 export function historyKey(date, hour) { return `${date}|${hour}`; }
 
 export function findComparisonSnapshot(history, date, hour) {
-  const exact = history[historyKey(date, hour)];
-  if (exact?.pull && exact?.unload) return { snapshot: exact, hour, exact: true };
+  const batch = REPORT_BATCHES.find((item) => item.hours.includes(hour));
+  if (!batch) return null;
   const candidates = Object.entries(history).flatMap(([key, snapshot]) => {
     const [snapshotDate, snapshotHour] = key.split("|");
     const parsedHour = Number(snapshotHour);
-    return snapshotDate === date && Number.isInteger(parsedHour) && snapshot?.pull && snapshot?.unload
-      ? [{ snapshot, hour: parsedHour, exact: false }]
+    return snapshotDate === date && batch.hours.includes(parsedHour) && snapshot?.pull && snapshot?.unload
+      ? [{ snapshot, hour: parsedHour, exact: parsedHour === hour, batch }]
       : [];
   });
   candidates.sort((left, right) => Math.abs(left.hour - hour) - Math.abs(right.hour - hour) || left.hour - right.hour);
   return candidates[0] ?? null;
+}
+
+export function reportBatchForHour(hour) {
+  return REPORT_BATCHES.find((item) => item.hours.includes(hour)) ?? null;
 }
 
 function scanSide(sheet, kind, columns, snapshots) {

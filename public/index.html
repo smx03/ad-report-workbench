@@ -168,14 +168,14 @@
         <div><div class="eyebrow">时报生成</div><h2>上传分时源表，生成两张时报</h2></div>
         <div class="hourly-controls">
           <div class="date-field"><label for="hourly-date">时报日期</label><input id="hourly-date" type="date"></div>
-          <div class="date-field"><label for="hourly-hour">发送时刻</label><select id="hourly-hour"><option value="12">12:00</option><option value="18" selected>18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option><option value="22">22:00</option><option value="23">23:00</option><option value="24">24:00</option></select></div>
+          <div class="date-field"><label for="hourly-hour">发送批次</label><select id="hourly-hour"><option value="11">11:00</option><option value="12">12:00</option><option value="18" selected>18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option><option value="22">22:00</option></select></div>
         </div>
       </div>
       <section class="upload-band" aria-labelledby="hourly-upload-title">
-        <div class="section-title-row"><div><h3 id="hourly-upload-title">分时源表</h3><p>自动识别日期，发送时刻统计该时刻之前的完整小时数据。</p></div><span class="local-only">本机处理</span></div>
+        <div class="section-title-row"><div><h3 id="hourly-upload-title">分时源表</h3><p>自动识别日期，当前指标使用导出文件中当天全部已有数据。</p></div><span class="local-only">本机处理</span></div>
         <div class="hourly-upload-grid">
           <div id="hourly-file-slot" class="file-slot">
-            <span class="file-index">H</span><span class="file-copy"><strong>时报导出源表</strong><small>需包含今天、昨天、前天的分时数据</small></span><span class="file-state">未选择</span>
+            <span class="file-index">H</span><span class="file-copy"><strong>时报导出源表</strong><small>需包含今天和昨天的分时数据</small></span><span class="file-state">未选择</span>
             <div class="file-actions"><label class="file-select" for="hourly-file">选择文件</label><button id="clear-hourly-file" class="file-clear" type="button" title="删除时报源表" aria-label="删除时报源表" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg></button></div>
             <input id="hourly-file" type="file" accept=".xlsx" hidden>
           </div>
@@ -184,7 +184,7 @@
             <div class="file-actions"><label class="file-select" for="hourly-history-file">选择历史工作簿</label><button id="clear-hourly-history" class="file-clear" type="button" title="清空历史时报基准" aria-label="清空历史时报基准" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg></button></div>
             <input id="hourly-history-file" type="file" accept=".xlsx" hidden>
           </div>
-          <div class="hourly-rule-note"><strong>计算口径</strong><span>消耗按0.8折算，量级取激活数；三项环比优先使用前一天同一时刻的历史时报快照；实时次留取前一天完整留存。</span></div>
+          <div class="hourly-rule-note"><strong>计算口径</strong><span>当前值取导出表中当天全部已有数据；环比仅匹配前一天同批次最接近时报：11/12、18/19、20/21/22；实时次留取前一天完整留存。</span></div>
         </div>
         <div class="action-row"><div id="hourly-upload-summary" class="upload-summary">等待上传1个分时源表</div><button id="generate-hourly" class="primary-button" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg>校验并生成时报</button></div>
       </section>
@@ -202,6 +202,6 @@
   <script src="./vendor/exceljs.min.js"></script>
   <script type="module" src="./navigation.js?v=20260720-3"></script>
   <script type="module" src="./app.js?v=20260720-3"></script>
-  <script type="module" src="./hourly-app.js?v=20260720-8"></script>
+  <script type="module" src="./hourly-app.js?v=20260720-10"></script>
 </body>
 </html>

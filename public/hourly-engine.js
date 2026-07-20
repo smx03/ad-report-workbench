@@ -93,11 +93,11 @@ function reportRow(kind, channelId, deviceId, deviceLabel, assessment, style, me
 
 function calculateLeaf(rows, filter, currentDate, previousDate, twoDaysAgo, cutoffHour) {
   const selected = rows.filter((row) => matches(row, filter));
-  const current = sum(selected.filter((row) => row.date === currentDate && row.hour < cutoffHour));
-  const previousComparable = sum(selected.filter((row) => row.date === previousDate && row.hour < cutoffHour));
+  const current = sum(selected.filter((row) => row.date === currentDate));
+  const previousComparable = sum(selected.filter((row) => row.date === previousDate));
   const previousFull = sum(selected.filter((row) => row.date === previousDate));
   const twoDaysFull = sum(selected.filter((row) => row.date === twoDaysAgo));
-  const twoDaysRetentionComparable = sum(selected.filter((row) => row.date === twoDaysAgo && row.hour < cutoffHour));
+  const twoDaysRetentionComparable = twoDaysFull;
   return metricsFromPeriods(current, previousComparable, previousFull, twoDaysFull, twoDaysRetentionComparable);
 }
 
@@ -160,8 +160,8 @@ function validateRows(rows, reportDate, cutoffHour) {
   if (!Number.isInteger(cutoffHour) || cutoffHour < 1 || cutoffHour > 24) throw new Error("截止时刻应为1:00至24:00");
   const dates = availableHourlyDates(rows);
   if (!dates.includes(reportDate)) throw new Error(`源表不包含${shortDate(reportDate)}的数据`);
-  const missing = [shiftDate(reportDate, -1), shiftDate(reportDate, -2)].filter((date) => !dates.includes(date));
-  if (missing.length) throw new Error(`计算环比与留存还需要${missing.map(shortDate).join("、")}的数据`);
+  const previousDate = shiftDate(reportDate, -1);
+  if (!dates.includes(previousDate)) throw new Error(`计算实时次留还需要${shortDate(previousDate)}的数据`);
 }
 
 function sum(rows) { return sumMetrics(rows); }
