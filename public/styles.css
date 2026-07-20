@@ -45,7 +45,7 @@ button { cursor: pointer; }
 .hourly-controls { display: flex; gap: 10px; }
 .hourly-controls .date-field { width: 150px; }
 .hourly-upload-grid { margin-top: 18px; display: grid; grid-template-columns: minmax(320px, .7fr) minmax(360px, 1.3fr); gap: 10px; }
-.hourly-rule-note { min-height: 116px; padding: 18px; border: 1px solid var(--line); background: #f7faf8; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+.hourly-rule-note { grid-column: 1 / -1; min-height: 72px; padding: 16px 18px; border: 1px solid var(--line); background: #f7faf8; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
 .hourly-rule-note strong { font-size: 13px; }
 .hourly-rule-note span { color: var(--muted); font-size: 12px; line-height: 1.7; }
 .local-only { padding: 5px 8px; border: 1px solid #aac7bb; background: #edf7f2; color: var(--green-dark); font-size: 11px; font-weight: 700; }

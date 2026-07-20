@@ -1,7 +1,7 @@
 const REQUIRED_HEADERS = ["时间-天", "时间-小时", "备注", "消耗", "激活数", "展示数", "点击数", "次留数"];
 const EMPTY = Object.freeze({ spend: 0, activations: 0, impressions: 0, clicks: 0, retained: 0 });
 
-export function buildHourlyReports(rows, reportDate, cutoffHour = 18) {
+export function buildHourlyReports(rows, reportDate, cutoffHour = 18, comparisonSnapshot = null) {
   validateRows(rows, reportDate, cutoffHour);
   const currentDate = normalizeDate(reportDate);
   const previousDate = shiftDate(currentDate, -1);
@@ -14,7 +14,7 @@ export function buildHourlyReports(rows, reportDate, cutoffHour = 18) {
     ],
     unload: [channel("dsp1", [device("and")]), channel("dsp2", [device("and")])],
   };
-  return {
+  const report = {
     reportDate: currentDate,
     cutoffHour,
     sourceRows: normalized.length,
@@ -22,6 +22,9 @@ export function buildHourlyReports(rows, reportDate, cutoffHour = 18) {
     pull: buildReport("pull", definitions.pull, normalized, currentDate, previousDate, twoDaysAgo, cutoffHour),
     unload: buildReport("unload", definitions.unload, normalized, currentDate, previousDate, twoDaysAgo, cutoffHour),
   };
+  if (comparisonSnapshot) applyHistoricalComparisons(report, comparisonSnapshot);
+  report.comparisonSource = comparisonSnapshot ? "history" : "source";
+  return report;
 }
 
 export function availableHourlyDates(rows) {
@@ -41,16 +44,51 @@ function buildReport(kind, channels, rows, currentDate, previousDate, twoDaysAgo
       const each = calculateLeaf(rows, { kind, channel: definition.id, device: deviceDefinition.id, assessment: "每留" }, currentDate, previousDate, twoDaysAgo, cutoffHour);
       const seven = calculateLeaf(rows, { kind, channel: definition.id, device: deviceDefinition.id, assessment: "七留" }, currentDate, previousDate, twoDaysAgo, cutoffHour);
       channelRows.push(
-        { channel: definition.id, device: deviceDefinition.label, assessment: "每留", style: "leaf", metrics: each },
-        { channel: definition.id, device: deviceDefinition.label, assessment: "七留", style: "leaf", metrics: seven },
-        { channel: definition.id, device: deviceDefinition.label, assessment: "汇总", style: "device-summary", metrics: combineMetrics([each, seven]) },
+        reportRow(kind, definition.id, deviceDefinition.id, deviceDefinition.label, "每留", "leaf", each),
+        reportRow(kind, definition.id, deviceDefinition.id, deviceDefinition.label, "七留", "leaf", seven),
+        reportRow(kind, definition.id, deviceDefinition.id, deviceDefinition.label, "汇总", "device-summary", combineMetrics([each, seven])),
       );
     }
     const total = combineMetrics(channelRows.filter((row) => row.style === "leaf").map((row) => row.metrics));
-    output.push(...channelRows, { channel: definition.id, device: "", assessment: "合计", style: "channel-total", metrics: total });
+    output.push(...channelRows);
+    if (kind === "pull") output.push(reportRow(kind, definition.id, "all", "", "合计", "channel-total", total));
   }
-  output.push({ channel: "", device: "", assessment: kind === "pull" ? "汇总" : "合计", style: "overall", metrics: combineMetrics(output.filter((row) => row.style === "leaf").map((row) => row.metrics)) });
+  output.push(reportRow(kind, "all", "all", "", kind === "pull" ? "汇总" : "合计", "overall", combineMetrics(output.filter((row) => row.style === "leaf").map((row) => row.metrics))));
   return { kind, rows: output };
+}
+
+function applyHistoricalComparisons(report, snapshot) {
+  for (const kind of ["pull", "unload"]) {
+    const baselines = new Map((snapshot[kind]?.rows ?? []).map((row) => [row.id, row.metrics]));
+    for (const row of report[kind].rows) {
+      const baseline = baselines.get(row.id);
+      if (!baseline) continue;
+      row.metrics.volumeChange = ratioChange(row.metrics.volume, baseline.volume);
+      row.metrics.costChange = kind === "unload"
+        ? legacyUnloadCostChange(row, baselines)
+        : ratioChange(row.metrics.discountCost, baseline.discountCost);
+      row.metrics.retentionChange = ratioChange(row.metrics.realtimeRetention, baseline.realtimeRetention);
+    }
+  }
+}
+
+// The 2606 unload template's cost comparison is shifted by one group. Preserve it so generated images match the sent report.
+function legacyUnloadCostChange(row, baselines) {
+  const baselineIds = {
+    "unload:dsp2:and:每留": "unload:dsp1:and:每留",
+    "unload:dsp2:and:汇总": "unload:dsp1:and:汇总",
+    "unload:all:all:合计": "unload:dsp2:and:汇总",
+  };
+  if (row.id === "unload:dsp1:and:汇总") {
+    row.metrics.costChangeError = "#VALUE!";
+    return null;
+  }
+  const baselineId = baselineIds[row.id];
+  return baselineId ? ratioChange(row.metrics.discountCost, baselines.get(baselineId)?.discountCost) : null;
+}
+
+function reportRow(kind, channelId, deviceId, deviceLabel, assessment, style, metrics) {
+  return { id: `${kind}:${channelId}:${deviceId}:${assessment}`, channel: channelId === "all" ? "" : channelId, device: deviceLabel, assessment, style, metrics };
 }
 
 function calculateLeaf(rows, filter, currentDate, previousDate, twoDaysAgo, cutoffHour) {
@@ -139,13 +177,13 @@ function divide(numerator, denominator) { return denominator ? numerator / denom
 function ratioChange(current, previous) { return current != null && previous ? current / previous - 1 : null; }
 function number(value) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : 0; }
 function normalizeHour(value) {
-  if (value instanceof Date) return value.getHours();
+  if (value instanceof Date) return value.getUTCHours();
   if (typeof value === "number" && value >= 0 && value < 1) return Math.floor(value * 24);
   const match = String(value ?? "").match(/(?:\s|^)(\d{1,2}):\d{2}/);
   return match ? Number(match[1]) : NaN;
 }
 function normalizeDate(value) {
-  if (value instanceof Date) return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+  if (value instanceof Date) return `${value.getUTCFullYear()}-${pad(value.getUTCMonth() + 1)}-${pad(value.getUTCDate())}`;
   if (typeof value === "number") { const date = new Date(Math.round((value - 25569) * 86400000)); return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`; }
   const match = String(value ?? "").match(/(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})/);
   return match ? `${match[1]}-${pad(match[2])}-${pad(match[3])}` : "";

@@ -1,6 +1,8 @@
-import { assertHourlyHeaders, availableHourlyDates, buildHourlyReports } from "./hourly-engine.js?v=20260720-3";
+import { assertHourlyHeaders, availableHourlyDates, buildHourlyReports } from "./hourly-engine.js?v=20260720-8";
+import { extractHourlyHistory, findComparisonSnapshot, historyKey, snapshotFromReport } from "./hourly-history.js?v=20260720-6";
 
-const state = { file: null, rows: [], report: null };
+const HISTORY_KEY = "doubao-hourly-snapshots-v1";
+const state = { file: null, rows: [], report: null, history: readHistory() };
 const input = document.querySelector("#hourly-file");
 const slot = document.querySelector("#hourly-file-slot");
 const dateInput = document.querySelector("#hourly-date");
@@ -8,12 +10,16 @@ const hourSelect = document.querySelector("#hourly-hour");
 const generateButton = document.querySelector("#generate-hourly");
 const validation = document.querySelector("#hourly-validation");
 const results = document.querySelector("#hourly-results");
+const historyInput = document.querySelector("#hourly-history-file");
 
 input.addEventListener("change", readWorkbook);
+historyInput.addEventListener("change", readHistoryWorkbook);
 document.querySelector("#clear-hourly-file").addEventListener("click", clearFile);
+document.querySelector("#clear-hourly-history").addEventListener("click", clearHistory);
 generateButton.addEventListener("click", generate);
 document.querySelector("#download-all-hourly").addEventListener("click", downloadAll);
 document.querySelectorAll("[data-hourly-download]").forEach((button) => button.addEventListener("click", () => downloadReport(button.dataset.hourlyDownload, button)));
+renderHistoryStatus();
 
 async function readWorkbook() {
   const file = input.files[0];
@@ -33,14 +39,15 @@ async function readWorkbook() {
   try {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(await file.arrayBuffer());
-    const sheet = workbook.worksheets[0];
-    if (!sheet) throw new Error("Excel中没有可读取的工作表");
-    const headers = sheet.getRow(1).values.slice(1).map((value) => String(value ?? "").trim());
+    const sheet = findHourlySourceSheet(workbook);
+    if (!sheet) throw new Error("Excel中未找到“分时源数据”或包含时报必需表头的工作表");
+    const headers = readHeaders(sheet);
     assertHourlyHeaders(headers);
+    const columns = uniqueHeaderColumns(headers);
     const rows = [];
     sheet.eachRow((row, index) => {
       if (index === 1) return;
-      const record = Object.fromEntries(headers.map((header, column) => [header, unwrap(row.getCell(column + 1).value)]));
+      const record = Object.fromEntries(columns.map(({ header, column }) => [header, unwrap(row.getCell(column).value)]));
       if (Object.values(record).some((value) => value !== null && value !== "")) rows.push(record);
     });
     const dates = availableHourlyDates(rows);
@@ -76,15 +83,24 @@ async function readWorkbook() {
 function generate() {
   generateButton.disabled = true;
   try {
-    const report = buildHourlyReports(state.rows, dateInput.value, Number(hourSelect.value));
+    const cutoffHour = Number(hourSelect.value);
+    const previousDate = shiftDate(dateInput.value, -1);
+    const comparison = findComparisonSnapshot(state.history, previousDate, cutoffHour);
+    const report = buildHourlyReports(state.rows, dateInput.value, cutoffHour, comparison?.snapshot ?? null);
     state.report = report;
+    state.history[historyKey(report.reportDate, report.cutoffHour)] = snapshotFromReport(report);
+    writeHistory(state.history);
+    renderHistoryStatus();
     renderReport("pull", report.pull);
     renderReport("unload", report.unload);
     const label = `${formatDate(report.reportDate)} ${pad(report.cutoffHour)}:00`;
     document.querySelector("#hourly-result-date").textContent = label;
     document.querySelector("#hourly-pull-title").textContent = `${label} 拉新时报`;
     document.querySelector("#hourly-unload-title").textContent = `${label} 卸载时报`;
-    showValidation("success", "校验通过", `已按${pad(report.cutoffHour)}:00前的完整小时数据生成，源表共读取${report.sourceRows.toLocaleString("zh-CN")}行。`);
+    const comparisonText = comparison
+      ? `三项环比使用${formatDate(previousDate)} ${pad(comparison.hour)}:00历史时报快照${comparison.exact ? "" : "（前一天无同一时刻，已自动取最接近时刻）"}。`
+      : `未找到${formatDate(previousDate)} ${pad(report.cutoffHour)}:00历史时报，三项环比暂按源表回算；导入历史时报基准后可与手工表对齐。`;
+    showValidation(comparison ? "success" : "warning", comparison ? "校验通过" : "已生成，缺少历史基准", `已读取${report.sourceRows.toLocaleString("zh-CN")}行。${comparisonText}`);
     results.classList.remove("hidden");
     results.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
@@ -92,6 +108,66 @@ function generate() {
     showValidation("error", "校验未通过", error.message);
   } finally {
     generateButton.disabled = !state.file;
+  }
+}
+
+async function readHistoryWorkbook() {
+  const file = historyInput.files[0];
+  if (!file) return;
+  const slot = document.querySelector("#hourly-history-slot");
+  const label = slot.querySelector(".file-select");
+  label.textContent = "正在提取历史";
+  label.classList.add("loading");
+  try {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await file.arrayBuffer());
+    const extracted = extractHourlyHistory(workbook);
+    const count = Object.keys(extracted).length;
+    if (!count) throw new Error("未找到可用的2606历史时报块");
+    state.history = { ...state.history, ...extracted };
+    writeHistory(state.history);
+    slot.classList.add("ready");
+    slot.querySelector(".file-state").textContent = file.name;
+    slot.querySelector("#clear-hourly-history").disabled = false;
+    label.textContent = "更新历史基准";
+    renderHistoryStatus();
+    resetResult();
+    toast(`已导入${count}个历史时报快照`);
+  } catch (error) {
+    slot.classList.remove("ready");
+    slot.querySelector(".file-state").textContent = "导入失败，请重新选择";
+    label.textContent = "重新选择";
+    showValidation("error", "历史基准导入失败", error.message);
+  } finally {
+    label.classList.remove("loading");
+    historyInput.value = "";
+  }
+}
+
+function clearHistory() {
+  state.history = {};
+  writeHistory(state.history);
+  const slot = document.querySelector("#hourly-history-slot");
+  slot.classList.remove("ready");
+  slot.querySelector(".file-state").textContent = "尚未导入";
+  slot.querySelector(".file-select").textContent = "选择历史工作簿";
+  slot.querySelector("#clear-hourly-history").disabled = true;
+  renderHistoryStatus();
+  resetResult();
+  toast("历史时报基准已清空");
+}
+
+function renderHistoryStatus() {
+  const count = Object.keys(state.history).length;
+  document.querySelector("#hourly-history-detail").textContent = count
+    ? `浏览器已保存${count}个历史快照，生成后会自动追加本次时报。`
+    : "首次使用请导入包含两张2606表的《豆包时报.xlsx》。";
+  const slot = document.querySelector("#hourly-history-slot");
+  if (count) {
+    slot.classList.add("ready");
+    if (slot.querySelector(".file-state").textContent === "尚未导入") slot.querySelector(".file-state").textContent = `已保存${count}个快照`;
+    slot.querySelector("#clear-hourly-history").disabled = false;
+    slot.querySelector(".file-select").textContent = "更新历史基准";
   }
 }
 
@@ -109,7 +185,7 @@ function renderDimensions(row) {
 function metricCells(metrics) {
   return [
     money(metrics.spend), money(metrics.discountSpend), integer(metrics.volume), percent(metrics.volumeChange), money(metrics.accountCost), money(metrics.discountCost),
-    percent(metrics.costChange), percent(metrics.realtimeRetention), percent(metrics.retentionChange), percent(metrics.ctr), percent(metrics.conversionRate),
+    metrics.costChangeError ?? percent(metrics.costChange), percent(metrics.realtimeRetention), percent(metrics.retentionChange), percent(metrics.ctr), percent(metrics.conversionRate),
   ].map((value) => `<td>${value}</td>`).join("");
 }
 
@@ -155,6 +231,26 @@ function clearFile() {
 function resetResult() { validation.classList.add("hidden"); results.classList.add("hidden"); }
 function showValidation(kind, title, message) { validation.className = `validation-band ${kind}`; validation.innerHTML = `<div>${kind === "success" ? "✓" : "!"}</div><div><strong>${escapeHtml(title)}</strong><span>${escapeHtml(message)}</span></div>`; }
 function unwrap(value) { return value && typeof value === "object" && "result" in value ? value.result : value && typeof value === "object" && "text" in value ? value.text : value; }
+function findHourlySourceSheet(workbook) {
+  const named = workbook.getWorksheet("分时源数据");
+  if (named) return named;
+  return workbook.worksheets.find((sheet) => {
+    const headers = readHeaders(sheet);
+    try { assertHourlyHeaders(headers); return true; } catch { return false; }
+  });
+}
+function readHeaders(sheet) {
+  const row = sheet.getRow(1);
+  return Array.from({ length: row.cellCount }, (_, index) => String(unwrap(row.getCell(index + 1).value) ?? "").trim());
+}
+function uniqueHeaderColumns(headers) {
+  const seen = new Set();
+  return headers.flatMap((header, index) => {
+    if (!header || seen.has(header)) return [];
+    seen.add(header);
+    return [{ header, column: index + 1 }];
+  });
+}
 function money(value) { return value == null ? "#DIV/0!" : Number(value).toFixed(2); }
 function integer(value) { return Math.round(Number(value) || 0).toString(); }
 function percent(value) { return value == null || !Number.isFinite(value) ? "#DIV/0!" : `${(value * 100).toFixed(2)}%`; }
@@ -221,3 +317,6 @@ async function tableToPng(table) {
 }
 
 function transparent(color) { return !color || color === "transparent" || color === "rgba(0, 0, 0, 0)"; }
+function readHistory() { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "{}"); } catch { return {}; } }
+function writeHistory(value) { try { localStorage.setItem(HISTORY_KEY, JSON.stringify(value)); } catch { /* History import remains optional. */ } }
+function shiftDate(value, days) { const date = new Date(`${value}T12:00:00`); date.setDate(date.getDate() + days); return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`; }

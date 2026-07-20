@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { buildHourlyReports } from "./public/hourly-engine.js";
+import { extractHourlyHistory, findComparisonSnapshot } from "./public/hourly-history.js";
 import { generateDailyReport } from "./public/report-engine.js";
 import { REPORT_CONFIG } from "./public/report-config.js";
 import fs from "node:fs";
 
 testDailyReport();
 testHourlyReport();
+testHourlyHistory();
 testUploadListenerIsolation();
 console.log("纯前端单元测试通过");
 
@@ -41,6 +43,43 @@ function testHourlyReport() {
   assert.equal(pull.discountSpend, 96);
   assert.ok(Math.abs(pull.volumeChange - 0.2) < 1e-12);
   assert.ok(Math.abs(pull.retentionChange - 0.05) < 1e-12);
+  const history = {
+    pull: { rows: [{ id: "pull:all:all:汇总", metrics: { volume: 10, discountCost: 10, realtimeRetention: 0.25 } }] },
+    unload: { rows: [{ id: "unload:dsp1:and:汇总", metrics: { volume: 1, discountCost: 10, realtimeRetention: 0.25 } }] },
+  };
+  const historicalReport = buildHourlyReports(rows, "2026-07-20", 18, history);
+  const historicalPull = historicalReport.pull.rows.find((row) => row.style === "overall").metrics;
+  assert.ok(Math.abs(historicalPull.volumeChange - 0.2) < 1e-12);
+  assert.ok(Math.abs(historicalPull.costChange - -0.2) < 1e-12);
+  assert.ok(Math.abs(historicalPull.retentionChange - 0.2) < 1e-12);
+  const historicalUnload = historicalReport.unload.rows.find((row) => row.id === "unload:dsp1:and:汇总").metrics;
+  assert.equal(historicalUnload.costChange, null);
+  assert.equal(historicalUnload.costChangeError, "#VALUE!");
+  const dateRows = [
+    { "时间-天": new Date("2026-07-18T00:00:00Z"), "时间-小时": new Date("2026-07-18T19:00:00Z"), "备注": "穿山甲-and-每留", "消耗": 80, "激活数": 8, "展示数": 100, "点击数": 10, "次留数": 2 },
+    { "时间-天": new Date("2026-07-19T00:00:00Z"), "时间-小时": new Date("2026-07-19T19:00:00Z"), "备注": "穿山甲-and-每留", "消耗": 100, "激活数": 10, "展示数": 100, "点击数": 10, "次留数": 3 },
+    { "时间-天": new Date("2026-07-20T00:00:00Z"), "时间-小时": new Date("2026-07-20T19:00:00Z"), "备注": "穿山甲-and-每留", "消耗": 120, "激活数": 12, "展示数": 100, "点击数": 10, "次留数": 0 },
+  ];
+  assert.equal(buildHourlyReports(dateRows, "2026-07-20", 20).pull.rows.at(-1).metrics.spend, 120);
+  assert.equal(buildHourlyReports(dateRows, "2026-07-20", 20).unload.rows.length, 7);
+}
+
+function testHourlyHistory() {
+  const workbook = fakeHistoryWorkbook();
+  const history = extractHourlyHistory(workbook);
+  const snapshot = history["2026-07-19|20"];
+  assert.ok(snapshot?.pull);
+  assert.ok(snapshot?.unload);
+  assert.equal(snapshot.pull.rows.length, 12);
+  assert.equal(snapshot.unload.rows.length, 7);
+  assert.equal(snapshot.pull.rows[0].metrics.volume, 100);
+  assert.equal(snapshot.unload.rows.at(-1).metrics.volume, 206);
+  const fallback = findComparisonSnapshot({
+    "2026-07-19|18": snapshot,
+    "2026-07-19|21": snapshot,
+  }, "2026-07-19", 20);
+  assert.equal(fallback.hour, 21);
+  assert.equal(fallback.exact, false);
 }
 
 function testUploadListenerIsolation() {
@@ -53,3 +92,35 @@ function source(rows) { return { sheetName: "数据", headers: ["账户", "账�
 function dataRow(id, account, spend, volume, activations, nextRetained, sevenRetained, impressions, clicks) { return { "账户": account, "账户id": id, "消耗": spend, "转化数": volume, "激活数": activations, "次留数": nextRetained, "7日留存数": sevenRetained, "展示数": impressions, "点击数": clicks }; }
 function mappingSource(rows) { return { sheetName: "账户分类库", headers: ["账户", "账户id", "推广目的", "联盟分类", "报表分类", "设备", "备注", "账户标签"], rows }; }
 function mappingRow(id, account, purpose, alliance, reportClass, device) { return { "账户": account, "账户id": id, "推广目的": purpose, "联盟分类": alliance, "报表分类": reportClass, "设备": device, "备注": "", "账户标签": "" }; }
+
+function fakeHistoryWorkbook() {
+  const sheets = new Map([
+    ["时报拉新-2606", fakeHistorySheet("拉新", 12, 100)],
+    ["时报卸载-2606", fakeHistorySheet("卸载", 7, 200)],
+  ]);
+  return { getWorksheet(name) { return sheets.get(name); } };
+}
+
+function fakeHistorySheet(title, rowCount, base) {
+  const rows = Array.from({ length: rowCount + 2 }, () => Array(31).fill(null));
+  rows[1][1] = new Date("2026-07-19T00:00:00Z");
+  rows[1][2] = new Date("1899-12-30T20:00:00Z");
+  rows[1][3] = title;
+  rows[1][5] = "消耗";
+  rows[1][16] = new Date("2026-07-19T00:00:00Z");
+  rows[1][17] = new Date("1899-12-30T20:00:00Z");
+  rows[1][18] = title;
+  rows[1][20] = "消耗";
+  for (let offset = 0; offset < rowCount; offset += 1) {
+    rows[offset + 2][7] = base + offset;
+    rows[offset + 2][10] = 5 + offset;
+    rows[offset + 2][12] = 0.2 + offset / 100;
+    rows[offset + 2][22] = base + offset;
+    rows[offset + 2][25] = 5 + offset;
+    rows[offset + 2][27] = 0.2 + offset / 100;
+  }
+  return {
+    rowCount: rows.length - 1,
+    getRow(index) { return { getCell(column) { return { value: rows[index]?.[column] ?? null }; } }; },
+  };
+}
