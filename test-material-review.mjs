@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { aggregateMaterialRows, buildMaterialReview, inferCreativeFeatures } from "./public/material-review-engine.js";
+import { buildCpaSeries, directionSpendBreakdown, paginateItems, paginationTokens } from "./public/material-review-view.js";
 
 const rows = [
   row("7547533469179641908", "外广", 500, 25, null, "荒野建造全过程 #抖音精选", "task-a"),
@@ -37,6 +38,16 @@ assert.equal(review.materials.find((item) => item.materialId === "75643783441895
 assert.equal(review.materials.find((item) => item.materialId === "7648912854939910178").classification, "数据不足");
 assert.equal(review.briefs.reduce((sum, item) => sum + item.quantity, 0), 17);
 assert.ok(review.briefs.every((item) => item.referenceIds.every((id) => typeof id === "string")));
+
+const page = paginateItems(Array.from({ length: 123 }, (_, index) => index + 1), 3, 50);
+assert.deepEqual({ page: page.page, totalPages: page.totalPages, startIndex: page.startIndex, endIndex: page.endIndex, first: page.items[0], last: page.items.at(-1) }, { page: 3, totalPages: 3, startIndex: 100, endIndex: 123, first: 101, last: 123 });
+assert.deepEqual(paginationTokens(6, 12), [1, "ellipsis", 5, 6, 7, "ellipsis", 12]);
+const directions = directionSpendBreakdown(review.materials, "外广");
+assert.ok(Math.abs(directions.reduce((sum, item) => sum + item.spendShare, 0) - 1) < 1e-12);
+const cpaSeries = buildCpaSeries(review.materials, review.thresholds, "外广", 3);
+assert.equal(cpaSeries.length, 3);
+assert.ok(cpaSeries[0].spend >= cpaSeries[1].spend);
+assert.equal(cpaSeries[0].targetCpa, 30);
 
 assert.deepEqual(inferCreativeFeatures("为什么一口气看完这部影视解说？ #抖音精选"), {
   direction: "影视长内容",
