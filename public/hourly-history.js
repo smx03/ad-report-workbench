@@ -1,8 +1,10 @@
 const SHEETS = { pull: "时报拉新-2606", unload: "时报卸载-2606" };
-const REPORT_BATCHES = [
-  { id: "morning", label: "第一批", hours: [11, 12] },
-  { id: "evening", label: "第二批", hours: [18, 19] },
-  { id: "night", label: "第三批", hours: [20, 21, 22] },
+const REPORT_SLOTS = [
+  { id: "11", label: "11点", reportHour: 11, comparisonHours: [11, 12] },
+  { id: "14", label: "14点", reportHour: 14, comparisonHours: [14, 15] },
+  { id: "16", label: "16点", reportHour: 16, comparisonHours: [16, 15] },
+  { id: "18", label: "18点", reportHour: 18, comparisonHours: [18, 19] },
+  { id: "21", label: "21点", reportHour: 21, comparisonHours: [21, 20, 22] },
 ];
 const LAYOUT = {
   pull: [
@@ -41,13 +43,13 @@ export function snapshotFromReport(report) {
 export function historyKey(date, hour) { return `${date}|${hour}`; }
 
 export function findComparisonSnapshot(history, date, hour) {
-  const batch = REPORT_BATCHES.find((item) => item.hours.includes(hour));
-  if (!batch) return null;
+  const slot = REPORT_SLOTS.find((item) => item.reportHour === hour);
+  if (!slot) return null;
   const candidates = Object.entries(history).flatMap(([key, snapshot]) => {
     const [snapshotDate, snapshotHour] = key.split("|");
     const parsedHour = Number(snapshotHour);
-    return snapshotDate === date && batch.hours.includes(parsedHour) && snapshot?.pull && snapshot?.unload
-      ? [{ snapshot, hour: parsedHour, exact: parsedHour === hour, batch }]
+    return snapshotDate === date && slot.comparisonHours.includes(parsedHour) && usableSnapshot(snapshot)
+      ? [{ snapshot, hour: parsedHour, exact: parsedHour === hour, batch: slot }]
       : [];
   });
   candidates.sort((left, right) => Math.abs(left.hour - hour) - Math.abs(right.hour - hour) || left.hour - right.hour);
@@ -55,7 +57,7 @@ export function findComparisonSnapshot(history, date, hour) {
 }
 
 export function reportBatchForHour(hour) {
-  return REPORT_BATCHES.find((item) => item.hours.includes(hour)) ?? null;
+  return REPORT_SLOTS.find((item) => item.reportHour === hour) ?? null;
 }
 
 function scanSide(sheet, kind, columns, snapshots) {
@@ -88,6 +90,12 @@ function scanSide(sheet, kind, columns, snapshots) {
 
 function compact(report) {
   return { rows: report.rows.map((row) => ({ id: row.id, metrics: { volume: row.metrics.volume, discountCost: row.metrics.discountCost, realtimeRetention: row.metrics.realtimeRetention } })) };
+}
+function usableSnapshot(snapshot) {
+  return [["pull", "pull:all:all:汇总"], ["unload", "unload:all:all:合计"]].every(([kind, id]) => {
+    const metrics = snapshot?.[kind]?.rows?.find((row) => row.id === id)?.metrics;
+    return Number(metrics?.volume) > 0 && Number.isFinite(Number(metrics?.discountCost)) && Number.isFinite(Number(metrics?.realtimeRetention));
+  });
 }
 function row(channel, device, assessment) { return { channel, device, assessment }; }
 function unwrap(value) { return value && typeof value === "object" && "result" in value ? value.result : value; }

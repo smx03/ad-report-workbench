@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>信息流投放工作台</title>
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?v=20260723-3">
 </head>
 <body>
   <header class="topbar">
@@ -254,7 +254,7 @@
         <div><div class="eyebrow">时报生成</div><h2>上传分时源表，生成两张时报</h2></div>
         <div class="hourly-controls">
           <div class="date-field"><label for="hourly-date">时报日期</label><input id="hourly-date" type="date"></div>
-          <div class="date-field"><label for="hourly-hour">发送批次</label><select id="hourly-hour"><option value="11">11:00</option><option value="12">12:00</option><option value="18" selected>18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option><option value="22">22:00</option></select></div>
+          <div class="date-field"><label for="hourly-hour">发送时间</label><select id="hourly-hour"><option value="11">11:00</option><option value="14">14:00</option><option value="16">16:00</option><option value="18" selected>18:00</option><option value="21">21:00</option></select></div>
         </div>
       </div>
       <section class="upload-band" aria-labelledby="hourly-upload-title">
@@ -266,17 +266,38 @@
             <input id="hourly-file" type="file" accept=".xlsx" hidden>
           </div>
           <div id="hourly-history-slot" class="file-slot">
-            <span class="file-index">历</span><span class="file-copy"><strong>历史时报基准</strong><small id="hourly-history-detail">首次使用请导入包含两张2606表的《豆包时报.xlsx》。</small></span><span class="file-state">尚未导入</span>
+            <span class="file-index">历</span><span class="file-copy"><strong>历史时报基准</strong><small id="hourly-history-detail">首次使用或更换电脑时，请导入同一份《豆包时报.xlsx》重建历史基准。</small></span><span class="file-state">尚未导入</span>
             <div class="file-actions"><label class="file-select" for="hourly-history-file">选择历史工作簿</label><button id="clear-hourly-history" class="file-clear" type="button" title="清空历史时报基准" aria-label="清空历史时报基准" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg></button></div>
             <input id="hourly-history-file" type="file" accept=".xlsx" hidden>
           </div>
-          <div class="hourly-rule-note"><strong>计算口径</strong><span>当前值取导出表中当天全部已有数据；环比仅匹配前一天同批次最接近时报：11/12、18/19、20/21/22；实时次留取前一天完整留存。</span></div>
+          <div class="hourly-rule-note"><strong>计算口径</strong><span>当前值取导出表中当天全部已有数据；发送时间为11/14/16/18/21点，旧历史兼容12/15/19/20/22点；实时次留取前一天完整留存，三项环比统一使用历史时报基准。</span></div>
         </div>
         <div class="action-row"><div id="hourly-upload-summary" class="upload-summary">等待上传1个分时源表</div><button id="generate-hourly" class="primary-button" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg>校验并生成时报</button></div>
       </section>
       <section id="hourly-validation" class="validation-band hidden" aria-live="polite"></section>
       <section id="hourly-results" class="results hidden">
         <div class="result-toolbar"><div><div class="eyebrow">生成结果</div><h3><span id="hourly-result-date"></span> 时报</h3></div><button id="download-all-hourly" class="secondary-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 20h14"/></svg>下载两张时报</button></div>
+        <section class="target-dashboard hourly-target-dashboard" aria-labelledby="hourly-target-dashboard-title">
+          <div class="target-dashboard-head">
+            <div><div class="eyebrow">客户目标达成</div><h3 id="hourly-target-dashboard-title">时报成本、次留与量级</h3><p>成本按折后成本计算；DSP1目标7.50元、DSP2目标7.00元，次留目标34.00%。</p></div>
+            <div class="hourly-target-legend" aria-label="达标规则"><span><i class="pass"></i>达标</span><span><i class="attention"></i>待优化</span></div>
+          </div>
+          <div id="hourly-target-summary" class="target-summary hourly-target-summary" aria-live="polite"></div>
+          <div class="target-chart-grid">
+            <section class="target-chart-pane" aria-labelledby="hourly-target-cost-title">
+              <div class="target-chart-title"><div><strong id="hourly-target-cost-title">折后成本差额</strong><span>低于目标即达标</span></div><em>元</em></div>
+              <div id="hourly-target-cost-chart" class="target-bar-chart"></div>
+            </section>
+            <section class="target-chart-pane" aria-labelledby="hourly-target-retention-title">
+              <div class="target-chart-title"><div><strong id="hourly-target-retention-title">实时次留差额</strong><span>不低于34%即达标</span></div><em>百分点</em></div>
+              <div id="hourly-target-retention-chart" class="target-bar-chart"></div>
+            </section>
+            <section class="target-chart-pane" aria-labelledby="hourly-target-volume-title">
+              <div class="target-chart-title"><div><strong id="hourly-target-volume-title">量级结构</strong><span>实际量级、占比与环比</span></div><em>转化数</em></div>
+              <div id="hourly-target-volume-chart" class="hourly-volume-chart"></div>
+            </section>
+          </div>
+        </section>
         <div class="report-stack">
           <article class="report-panel"><div class="report-panel-head"><h4 id="hourly-pull-title">拉新时报</h4><button data-hourly-download="pull" class="secondary-button report-download" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 20h14"/></svg>下载图片</button></div><div id="hourly-pull-report" class="report-canvas-wrap"></div></article>
           <article class="report-panel"><div class="report-panel-head"><h4 id="hourly-unload-title">卸载时报</h4><button data-hourly-download="unload" class="secondary-button report-download" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M5 20h14"/></svg>下载图片</button></div><div id="hourly-unload-report" class="report-canvas-wrap"></div></article>
@@ -387,7 +408,7 @@
   <script type="module" src="./navigation.js?v=20260720-5"></script>
   <script type="module" src="./material-review-app.js?v=20260723-1"></script>
   <script type="module" src="./app.js?v=20260720-4"></script>
-  <script type="module" src="./hourly-app.js?v=20260720-10"></script>
+  <script type="module" src="./hourly-app.js?v=20260723-4"></script>
   <script type="module" src="./onestop-app.js?v=20260720-1"></script>
 </body>
 </html>

@@ -1,7 +1,8 @@
-import { assertHourlyHeaders, availableHourlyDates, buildHourlyReports } from "./hourly-engine.js?v=20260720-9";
-import { extractHourlyHistory, findComparisonSnapshot, historyKey, reportBatchForHour, snapshotFromReport } from "./hourly-history.js?v=20260720-7";
+import { assertHourlyHeaders, availableHourlyDates, buildHourlyReports } from "./hourly-engine.js?v=20260723-2";
+import { extractHourlyHistory, findComparisonSnapshot, historyKey, reportBatchForHour, snapshotFromReport } from "./hourly-history.js?v=20260723-2";
+import { renderHourlyTargetDashboard } from "./hourly-target-view.js?v=20260723-1";
 
-const HISTORY_KEY = "doubao-hourly-snapshots-v1";
+const HISTORY_KEY = "doubao-hourly-snapshots-v2";
 const state = { file: null, rows: [], report: null, history: readHistory() };
 const input = document.querySelector("#hourly-file");
 const slot = document.querySelector("#hourly-file-slot");
@@ -88,7 +89,7 @@ function generate() {
     const batch = reportBatchForHour(cutoffHour);
     if (!batch) throw new Error("请选择有效的时报批次");
     const comparison = findComparisonSnapshot(state.history, previousDate, cutoffHour);
-    if (!comparison) throw new Error(`${formatDate(previousDate)}缺少${batch.label}历史时报（${batch.hours.map((hour) => `${hour}:00`).join("或")}），请先更新历史基准。`);
+    if (!comparison) throw new Error(`${formatDate(previousDate)}缺少${batch.label}有效历史时报（${batch.comparisonHours.map((hour) => `${hour}:00`).join("或")}），请先更新历史基准。`);
     const report = buildHourlyReports(state.rows, dateInput.value, cutoffHour, comparison?.snapshot ?? null);
     state.report = report;
     state.history[historyKey(report.reportDate, report.cutoffHour)] = snapshotFromReport(report);
@@ -96,11 +97,18 @@ function generate() {
     renderHistoryStatus();
     renderReport("pull", report.pull);
     renderReport("unload", report.unload);
+    renderHourlyTargetDashboard({
+      report,
+      summary: document.querySelector("#hourly-target-summary"),
+      costChart: document.querySelector("#hourly-target-cost-chart"),
+      retentionChart: document.querySelector("#hourly-target-retention-chart"),
+      volumeChart: document.querySelector("#hourly-target-volume-chart"),
+    });
     const label = `${formatDate(report.reportDate)} ${pad(report.cutoffHour)}:00`;
     document.querySelector("#hourly-result-date").textContent = label;
     document.querySelector("#hourly-pull-title").textContent = `${label} 拉新时报`;
     document.querySelector("#hourly-unload-title").textContent = `${label} 卸载时报`;
-    const comparisonText = `当前值使用导出表中${formatDate(report.reportDate)}的全部已有数据；三项环比使用${formatDate(previousDate)} ${pad(comparison.hour)}:00历史时报${comparison.exact ? "" : "（同批次最接近时刻）"}。`;
+    const comparisonText = `三项环比使用${formatDate(previousDate)} ${pad(comparison.hour)}:00历史时报${comparison.exact ? "" : "（兼容旧时刻）"}。`;
     showValidation("success", "校验通过", `已读取${report.sourceRows.toLocaleString("zh-CN")}行。${comparisonText}`);
     results.classList.remove("hidden");
     results.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -125,7 +133,7 @@ async function readHistoryWorkbook() {
     const extracted = extractHourlyHistory(workbook);
     const count = Object.keys(extracted).length;
     if (!count) throw new Error("未找到可用的2606历史时报块");
-    state.history = { ...state.history, ...extracted };
+    state.history = extracted;
     writeHistory(state.history);
     slot.classList.add("ready");
     slot.querySelector(".file-state").textContent = file.name;
@@ -133,7 +141,7 @@ async function readHistoryWorkbook() {
     label.textContent = "更新历史基准";
     renderHistoryStatus();
     resetResult();
-    toast(`已导入${count}个历史时报快照`);
+    toast(`已按工作簿重建${count}个历史时报快照`);
   } catch (error) {
     slot.classList.remove("ready");
     slot.querySelector(".file-state").textContent = "导入失败，请重新选择";
@@ -162,7 +170,7 @@ function renderHistoryStatus() {
   const count = Object.keys(state.history).length;
   document.querySelector("#hourly-history-detail").textContent = count
     ? `浏览器已保存${count}个历史快照，生成后会自动追加本次时报。`
-    : "首次使用请导入包含两张2606表的《豆包时报.xlsx》。";
+    : "首次使用或更换电脑时，请导入同一份《豆包时报.xlsx》重建历史基准。";
   const slot = document.querySelector("#hourly-history-slot");
   if (count) {
     slot.classList.add("ready");
