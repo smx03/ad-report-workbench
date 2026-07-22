@@ -84,6 +84,16 @@
         <div class="material-segmented" role="tablist" aria-label="复盘视图"><button class="active" data-material-tab="overview" role="tab">周度总览</button><button data-material-tab="materials" role="tab">素材清单</button><button data-material-tab="brief" role="tab">下周创意Brief</button></div>
 
         <section id="material-overview-panel" class="material-panel" data-material-panel="overview">
+          <section class="material-analytics-band" aria-labelledby="material-analytics-title">
+            <div class="material-analytics-head">
+              <div><div class="eyebrow">Performance map</div><h4 id="material-analytics-title">素材结构与成本分布</h4><p>消耗结构看方向集中度，成本曲线看高消耗素材是否守住对应版位目标。</p></div>
+              <label class="select-field material-chart-filter"><span>分析版位</span><select id="material-chart-placement"><option value="全部">全部版位</option><option value="内广">内广</option><option value="外广">外广</option></select></label>
+            </div>
+            <div class="material-chart-grid">
+              <div class="material-chart-pane"><div class="material-chart-title"><strong>内容方向消耗占比</strong><span id="material-pie-context">全部版位</span></div><div id="material-direction-pie" class="material-pie-layout"></div></div>
+              <div class="material-chart-pane"><div class="material-chart-title"><strong>高消耗素材成本曲线</strong><span id="material-line-context">按消耗排序 · 成本越低越好</span></div><div id="material-cpa-line" class="material-line-chart"></div></div>
+            </div>
+          </section>
           <div class="material-panel-grid">
             <article class="material-section"><div class="material-section-head"><div><div class="eyebrow">Content signals</div><h4>内容方向表现</h4></div><span class="section-note">依据标题、标签与数据表现</span></div><div id="material-direction-list" class="direction-list"></div></article>
             <article class="material-section"><div class="material-section-head"><div><div class="eyebrow">Top evidence</div><h4>本周重点素材</h4></div><span class="section-note">先看能复制的证据</span></div><div id="material-top-list" class="material-top-list"></div></article>
@@ -92,8 +102,9 @@
         </section>
 
         <section id="material-materials-panel" class="material-panel hidden" data-material-panel="materials">
-          <div class="material-panel-headline"><div><div class="eyebrow">Material ledger</div><h4>素材执行清单</h4><p>点击任意素材查看数据、标题语义、参考链接和推断边界。</p></div><div class="material-filters"><label class="search-field"><span>搜索</span><input id="material-search" type="search" placeholder="素材ID、标题或任务"></label><label class="select-field"><span>版位</span><select id="material-placement-filter"><option value="全部">全部版位</option><option value="内广">内广</option><option value="外广">外广</option></select></label><label class="select-field"><span>分层</span><select id="material-status-filter"><option value="全部">全部分层</option><option value="跑量优质">跑量优质</option><option value="跑量待优化">跑量待优化</option><option value="高效潜力">高效潜力</option><option value="稳态观察">稳态观察</option><option value="低效观察">低效观察</option><option value="数据不足">数据不足</option></select></label></div></div>
+          <div class="material-panel-headline"><div><div class="eyebrow">Material ledger</div><h4>素材执行清单</h4><p>点击素材ID查看数据证据；<span id="material-table-count">等待生成数据</span></p></div><div class="material-filters"><label class="search-field"><span>搜索</span><input id="material-search" type="search" placeholder="素材ID、标题或任务"></label><label class="select-field"><span>版位</span><select id="material-placement-filter"><option value="全部">全部版位</option><option value="内广">内广</option><option value="外广">外广</option></select></label><label class="select-field"><span>分层</span><select id="material-status-filter"><option value="全部">全部分层</option><option value="跑量优质">跑量优质</option><option value="跑量待优化">跑量待优化</option><option value="高效潜力">高效潜力</option><option value="稳态观察">稳态观察</option><option value="低效观察">低效观察</option><option value="数据不足">数据不足</option></select></label></div></div>
           <div class="material-table-wrap"><table class="material-table"><thead><tr><th>素材 / 标题</th><th>版位</th><th>消耗</th><th>转化</th><th>成本</th><th>次留率</th><th>内容方向</th><th>周度结论</th></tr></thead><tbody id="material-table-body"></tbody></table></div>
+          <div id="material-pagination" class="material-pagination hidden" aria-label="素材清单分页"><div class="material-page-summary"><strong id="material-page-range">0-0</strong><span id="material-page-total">共0条</span></div><div class="material-page-controls"><button id="material-page-prev" class="material-page-arrow" type="button" aria-label="上一页"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button><div id="material-page-numbers" class="material-page-numbers"></div><button id="material-page-next" class="material-page-arrow" type="button" aria-label="下一页"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button></div></div>
         </section>
 
         <section id="material-brief-panel" class="material-panel hidden" data-material-panel="brief">
@@ -374,7 +385,7 @@
   <script src="./vendor/jszip.min.js"></script>
   <script src="./vendor/exceljs.min.js"></script>
   <script type="module" src="./navigation.js?v=20260720-5"></script>
-  <script type="module" src="./material-review-app.js?v=20260720-1"></script>
+  <script type="module" src="./material-review-app.js?v=20260723-1"></script>
   <script type="module" src="./app.js?v=20260720-4"></script>
   <script type="module" src="./hourly-app.js?v=20260720-10"></script>
   <script type="module" src="./onestop-app.js?v=20260720-1"></script>
