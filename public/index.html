@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>信息流投放工作台</title>
-  <link rel="stylesheet" href="./styles.css?v=20260723-3">
+  <link rel="stylesheet" href="./styles.css?v=20260723-4">
 </head>
 <body>
   <header class="topbar">
@@ -109,8 +109,12 @@
 
         <section id="material-brief-panel" class="material-panel hidden" data-material-panel="brief">
           <div class="brief-panel-head"><div><div class="eyebrow">Next week production plan</div><h4>下周创意 Brief</h4><p>数量会与“下周总产能”一致；每一条方向都带有本周素材证据。</p></div><div id="material-brief-capacity" class="brief-capacity"></div></div>
+          <section class="supplier-plan-section" aria-labelledby="supplier-plan-title">
+            <div class="supplier-plan-head"><div><div class="eyebrow">Supplier allocation</div><h5 id="supplier-plan-title">优矩 · 禾也/禾悦产能分工</h5><p>只用可归因的供应商实绩分配；客户共享的一口价原素材不进入计算。</p></div><span class="supplier-plan-method">成本 · 转化规模 · 次留</span></div>
+            <div id="material-supplier-plan" class="supplier-plan-chart"></div>
+          </section>
           <div id="material-brief-list" class="brief-list"></div>
-          <div class="brief-boundary"><strong>推断边界</strong><span>当前数据能判断标题/标签语义、任务类型和投放结果；前三秒画面、口播语气、字幕节奏需要接入视频文件或优量素材链接后再自动拆解。</span></div>
+          <div class="brief-boundary"><strong>推断边界</strong><span>供应商优势是基于本周已投素材的相对表现，用于下周试排产和对照，不等于因果结论。前三秒画面、口播语气、字幕节奏仍需接入视频后再拆解。</span></div>
         </section>
       </section>
     </section>
@@ -406,7 +410,7 @@
   <script src="./vendor/jszip.min.js"></script>
   <script src="./vendor/exceljs.min.js"></script>
   <script type="module" src="./navigation.js?v=20260720-5"></script>
-  <script type="module" src="./material-review-app.js?v=20260723-1"></script>
+  <script type="module" src="./material-review-app.js?v=20260723-4"></script>
   <script type="module" src="./app.js?v=20260720-4"></script>
   <script type="module" src="./hourly-app.js?v=20260723-4"></script>
   <script type="module" src="./onestop-app.js?v=20260720-1"></script>

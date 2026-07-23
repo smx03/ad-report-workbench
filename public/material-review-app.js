@@ -1,5 +1,5 @@
-import { buildMaterialReview } from "./material-review-engine.js?v=20260720-1";
-import { readMaterialWorkbook } from "./material-review-reader.js?v=20260720-1";
+import { buildMaterialReview } from "./material-review-engine.js?v=20260723-3";
+import { readMaterialWorkbook } from "./material-review-reader.js?v=20260723-3";
 import { buildCpaSeries, directionSpendBreakdown, MATERIAL_PAGE_SIZE, paginateItems, paginationTokens } from "./material-review-view.js?v=20260723-1";
 
 const root = document.querySelector("#weekly-material-page");
@@ -15,6 +15,7 @@ const clearAllButton = root.querySelector("#clear-material-all");
 const validation = root.querySelector("#material-validation");
 const results = root.querySelector("#material-results");
 const detailDialog = document.querySelector("#material-detail-dialog");
+let capacityRebuildTimer = null;
 
 fileInput.addEventListener("change", () => {
   const file = fileInput.files[0];
@@ -53,6 +54,15 @@ for (const id of ["material-target-inner", "material-target-outer", "material-mi
     renderReview();
   });
 }
+root.querySelector("#material-weekly-capacity").addEventListener("input", () => {
+  if (!state.dataset) return;
+  clearTimeout(capacityRebuildTimer);
+  capacityRebuildTimer = setTimeout(() => {
+    state.tablePage = 1;
+    rebuildReview();
+    renderReview();
+  }, 180);
+});
 
 root.querySelector("#material-search").addEventListener("input", resetAndRenderMaterialTable);
 root.querySelector("#material-placement-filter").addEventListener("change", resetAndRenderMaterialTable);
@@ -89,9 +99,10 @@ async function generateReview() {
     renderReview();
     const sourceRows = state.dataset.rows.length;
     const materialCount = state.review.materials.length;
+    const supplierPlan = state.review.supplierPlan;
     validation.className = "validation-band success";
     const warnings = state.review.warnings.length ? ` 数据提示：${state.review.warnings.map(escapeHtml).join(" ")}` : "";
-    validation.innerHTML = `<div>✓</div><div><strong>读取完成：${integer(sourceRows)}行已聚合为${integer(materialCount)}条版位素材</strong><span>已识别${state.dataset.sourceSheets.map((sheet) => `${escapeHtml(sheet.placement)} ${integer(sheet.rowCount)}行`).join("、")}；重复素材已按版位和素材ID合并。${warnings}</span></div>`;
+    validation.innerHTML = `<div>✓</div><div><strong>读取完成：${integer(sourceRows)}行已聚合为${integer(materialCount)}条版位素材</strong><span>已识别${state.dataset.sourceSheets.map((sheet) => `${escapeHtml(sheet.placement)} ${integer(sheet.rowCount)}行`).join("、")}；优矩/禾也可归因${integer(supplierPlan.identifiableCount)}条，产能计算已排除${integer(supplierPlan.excludedOriginalPriceCount)}条一口价原素材。${warnings}</span></div>`;
     results.classList.remove("hidden");
     results.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
@@ -133,6 +144,7 @@ function renderReview() {
   renderTopMaterials(review.materials);
   renderInsights(review);
   renderMaterialTable();
+  renderSupplierPlan(review.supplierPlan);
   renderBriefs(review.briefs);
 }
 
@@ -343,9 +355,40 @@ function renderBriefs(briefs) {
   root.querySelector("#material-brief-capacity").innerHTML = `<span>下周建议总产能</span><strong>${integer(total)} 条</strong>`;
   root.querySelector("#material-brief-list").innerHTML = briefs.map((item, index) => `<article class="brief-card">
     <div class="brief-card-head"><span class="brief-number">${String(index + 1).padStart(2, "0")}</span><div class="brief-title"><span>${escapeHtml(item.strategy)} · ${escapeHtml(item.priority)}</span><h5>${escapeHtml(item.direction)}</h5></div><div class="brief-quantity"><strong>${integer(item.quantity)}</strong><span>建议条数</span></div></div>
+    ${briefSupplierPlan(item.supplierAllocation)}
     <div class="brief-body"><div class="brief-field"><span>目标人群</span><p>${escapeHtml(item.audience)}</p></div><div class="brief-field"><span>开场钩子</span><p>${escapeHtml(item.hook)}</p></div><div class="brief-field"><span>内容结构</span><p>${escapeHtml(item.structure)}</p></div><div class="brief-field"><span>本轮变量</span><p>${escapeHtml(item.tests)}</p></div></div>
     <div class="brief-evidence"><span>数据依据</span><p>${escapeHtml(item.evidence)}${item.referenceIds?.length ? `；参考素材 ${item.referenceIds.map(escapeHtml).join("、")}` : ""}</p></div>
   </article>`).join("") || `<div class="material-section empty-material-state">当前有效素材不足，暂未生成下周创意Brief。</div>`;
+}
+
+function renderSupplierPlan(plan) {
+  const container = root.querySelector("#material-supplier-plan");
+  if (!plan?.directions?.length) {
+    container.innerHTML = `<div class="empty-material-state">暂无可分配的下周产能</div>`;
+    return;
+  }
+  const [youju, heye] = plan.suppliers;
+  const rows = plan.directions.map((item) => {
+    const [left, right] = item.allocation;
+    return `<article class="supplier-direction-row">
+      <div class="supplier-direction-title"><strong>${escapeHtml(item.direction)}</strong><span>${integer(item.quantity)}条 · ${escapeHtml(item.confidence)}置信度${item.usesFallback ? " · 全盘参考" : ""}</span></div>
+      <div class="supplier-stack" role="img" aria-label="${escapeAttribute(`${item.direction}：优矩${left.quantity}条，禾也/禾悦${right.quantity}条`)}"><span class="is-youju" style="width:${(left.share * 100).toFixed(2)}%"></span><span class="is-heye" style="width:${(right.share * 100).toFixed(2)}%"></span></div>
+      <div class="supplier-row-values"><span><i class="is-youju"></i>优矩 <strong>${integer(left.quantity)}</strong></span><span><i class="is-heye"></i>禾也/禾悦 <strong>${integer(right.quantity)}</strong></span></div>
+      <p>${escapeHtml(item.reason)}</p>
+    </article>`;
+  }).join("");
+  container.innerHTML = `<div class="supplier-overall">
+    <div class="supplier-overall-copy"><strong>${integer(plan.totalCapacity)}条产能建议</strong><span>优矩${integer(youju.quantity)}条 · 禾也/禾悦${integer(heye.quantity)}条</span></div>
+    <div class="supplier-stack supplier-stack-overall" role="img" aria-label="总产能：优矩${integer(youju.quantity)}条，禾也/禾悦${integer(heye.quantity)}条"><span class="is-youju" style="width:${(youju.share * 100).toFixed(2)}%"></span><span class="is-heye" style="width:${(heye.share * 100).toFixed(2)}%"></span></div>
+    <div class="supplier-overall-metrics"><span><i class="is-youju"></i><b>优矩 ${percent(youju.share)}</b><small>${integer(youju.materialCount)}条样本 · 成本${money(youju.cpa)}</small></span><span><i class="is-heye"></i><b>禾也/禾悦 ${percent(heye.share)}</b><small>${integer(heye.materialCount)}条样本 · 成本${money(heye.cpa)}</small></span></div>
+    <div class="supplier-scope-note">排除${integer(plan.excludedOriginalPriceCount)}条客户共享一口价原素材（${money(plan.excludedOriginalPriceSpend)}）；保留${integer(plan.retainedSecondEditCount)}条一口价二剪。${plan.unresolvedCount || plan.mixedCount ? `另有${integer(plan.unresolvedCount)}条待识别、${integer(plan.mixedCount)}条混合归因，不强行分给任一家。` : ""}</div>
+  </div><div class="supplier-direction-list">${rows}</div>`;
+}
+
+function briefSupplierPlan(plan) {
+  if (!plan?.allocation?.length) return "";
+  const [youju, heye] = plan.allocation;
+  return `<div class="brief-supplier-plan"><div class="brief-supplier-head"><span>产能分工 · ${escapeHtml(plan.confidence)}置信度</span><strong>优矩 ${integer(youju.quantity)} · 禾也/禾悦 ${integer(heye.quantity)}</strong></div><div class="supplier-stack" role="img" aria-label="优矩${integer(youju.quantity)}条，禾也/禾悦${integer(heye.quantity)}条"><span class="is-youju" style="width:${(youju.share * 100).toFixed(2)}%"></span><span class="is-heye" style="width:${(heye.share * 100).toFixed(2)}%"></span></div><p>${escapeHtml(plan.reason)}</p></div>`;
 }
 
 function handleMaterialClick(event) {
@@ -360,7 +403,7 @@ function showMaterialDetail(item) {
   document.querySelector("#material-detail-body").innerHTML = `<div class="detail-metrics"><div><span>消耗</span><strong>${money(item.spend)}</strong></div><div><span>转化数</span><strong>${integer(item.conversions)}</strong></div><div><span>转化成本</span><strong>${money(item.cpa)}</strong></div><div><span>次留率</span><strong>${materialRetention(item)}</strong></div></div>
     <div class="detail-block"><span>视频标题</span><p>${escapeHtml(item.title || "未填写")}</p></div>
     <div class="detail-block"><span>智能归纳</span><div class="detail-tags"><i>${escapeHtml(item.classification)}</i><i>${escapeHtml(item.direction)}</i><i>${escapeHtml(item.hookType)}</i>${(item.hashtags || []).slice(0, 6).map((tag) => `<i>${escapeHtml(tag)}</i>`).join("")}</div><p>${escapeHtml(item.evidence)}</p></div>
-    <div class="detail-block"><span>任务与归因</span><p>${escapeHtml((item.taskNames || [item.taskName]).filter(Boolean).join("；") || "任务名称未匹配")}<br>已合并${integer(item.sourceRows || 1)}条原始记录。</p></div>
+    <div class="detail-block"><span>任务与归因</span><p>${escapeHtml((item.taskNames || [item.taskName]).filter(Boolean).join("；") || "任务名称未匹配")}<br>服务商：${escapeHtml(item.supplierGroup)}（${escapeHtml(item.supplierConfidence)}置信度）· ${escapeHtml(item.priceType)}<br>${escapeHtml(item.supplierEvidence || "暂无服务商证据")}<br>已合并${integer(item.sourceRows || 1)}条原始记录。</p></div>
     <div class="detail-block"><span>推断说明</span><p>内容方向和钩子类型来自标题与标签语义；当前没有读取视频画面，因此不把它作为前三秒镜头或口播结论。</p></div>`;
   const link = document.querySelector("#material-detail-link");
   link.href = item.videoUrl || "#";
@@ -380,8 +423,15 @@ function selectTab(tab) {
 async function copyBrief() {
   if (!state.review) return;
   const lines = [`${state.dataset.weekLabel} 抖音精选素材周度复盘`, `下周建议总产能：${state.review.briefs.reduce((sum, item) => sum + item.quantity, 0)}条`, ""];
+  const [youju, heye] = state.review.supplierPlan.suppliers;
+  lines.push(`供应商总分配：优矩${youju.quantity}条，禾也/禾悦${heye.quantity}条`, `口径：排除${state.review.supplierPlan.excludedOriginalPriceCount}条客户共享一口价原素材，保留${state.review.supplierPlan.retainedSecondEditCount}条一口价二剪。`, "");
   state.review.briefs.forEach((item, index) => {
     lines.push(`${index + 1}. ${item.direction}｜${item.quantity}条｜${item.strategy}`);
+    if (item.supplierAllocation) {
+      const [left, right] = item.supplierAllocation.allocation;
+      lines.push(`产能分工：优矩${left.quantity}条，禾也/禾悦${right.quantity}条（${item.supplierAllocation.confidence}置信度）`);
+      lines.push(`分配依据：${item.supplierAllocation.reason}`);
+    }
     lines.push(`目标人群：${item.audience}`);
     lines.push(`开场钩子：${item.hook}`);
     lines.push(`内容结构：${item.structure}`);
@@ -400,8 +450,8 @@ async function copyBrief() {
 
 function downloadMaterialCsv() {
   if (!state.review) return;
-  const headers = ["素材ID", "版位", "视频标题", "视频链接", "消耗", "转化数", "转化成本", "次留率", "内容方向", "钩子类型", "周度结论", "判断依据"];
-  const rows = state.review.materials.map((item) => [item.materialId, item.placement, item.title, item.videoUrl, item.spend, item.conversions, item.cpa, item.retentionRate, item.direction, item.hookType, item.classification, item.evidence]);
+  const headers = ["素材ID", "版位", "视频标题", "视频链接", "消耗", "转化数", "转化成本", "次留率", "内容方向", "钩子类型", "服务商分组", "归因置信度", "归因依据", "一口价口径", "周度结论", "判断依据"];
+  const rows = state.review.materials.map((item) => [item.materialId, item.placement, item.title, item.videoUrl, item.spend, item.conversions, item.cpa, item.retentionRate, item.direction, item.hookType, item.supplierGroup, item.supplierConfidence, item.supplierEvidence, item.priceType, item.classification, item.evidence]);
   const csv = `\uFEFF${[headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n")}`;
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   const anchor = document.createElement("a");

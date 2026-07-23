@@ -25,6 +25,9 @@ const AUDIENCE_BY_DIRECTION = {
   泛内容探索: "尚未形成稳定偏好的泛内容用户",
 };
 
+const TARGET_SUPPLIERS = ["优矩", "禾也/禾悦"];
+const CONFIDENCE_RANK = { 高: 0, 中: 1, 低: 2, 待核验: 3 };
+
 export function buildMaterialReview(rows, options = {}) {
   const config = normalizeOptions(options);
   const materials = aggregateMaterialRows(rows).map((item) => enrichCreativeFeatures(item));
@@ -36,13 +39,17 @@ export function buildMaterialReview(rows, options = {}) {
   const directionSummaries = Object.values(groupSummaries(materials, (item) => item.direction, summary.totalSpend))
     .sort((a, b) => b.spend - a.spend || a.cpa - b.cpa);
   const briefs = generateNextWeekBriefs(materials, directionSummaries, config.weeklyCapacity);
+  const supplierPlan = buildSupplierPlan(materials, briefs);
+  const briefPlans = new Map(supplierPlan.directions.map((item) => [item.direction, item]));
+  const linkedBriefs = briefs.map((brief) => ({ ...brief, supplierAllocation: briefPlans.get(brief.direction) || null }));
 
   return {
     materials,
     summary,
     placementSummaries,
     directionSummaries,
-    briefs,
+    briefs: linkedBriefs,
+    supplierPlan,
     thresholds,
     warnings: buildWarnings(materials),
   };
@@ -62,6 +69,10 @@ export function normalizeMaterialRows(rows = []) {
     taskType: String(row.taskType ?? "").trim(),
     provider: String(row.provider ?? "").trim(),
     channel: String(row.channel ?? "").trim(),
+    supplierGroup: String(row.supplierGroup ?? "待识别").trim() || "待识别",
+    supplierEvidence: String(row.supplierEvidence ?? "").trim(),
+    supplierConfidence: String(row.supplierConfidence ?? "待核验").trim() || "待核验",
+    priceType: String(row.priceType ?? "常规素材").trim() || "常规素材",
     sourceSheet: String(row.sourceSheet ?? "").trim(),
   })).filter((row) => row.materialId);
 }
@@ -86,6 +97,10 @@ export function aggregateMaterialRows(rows = []) {
         taskNames: [],
         taskTypes: [],
         providers: [],
+        supplierGroups: [],
+        supplierEvidenceItems: [],
+        supplierConfidences: [],
+        priceTypes: [],
         sourceSheets: [],
       });
     }
@@ -104,16 +119,29 @@ export function aggregateMaterialRows(rows = []) {
     addUnique(item.taskNames, row.taskName);
     addUnique(item.taskTypes, row.taskType);
     addUnique(item.providers, row.provider);
+    addUnique(item.supplierGroups, row.supplierGroup);
+    addUnique(item.supplierEvidenceItems, row.supplierEvidence);
+    addUnique(item.supplierConfidences, row.supplierConfidence);
+    addUnique(item.priceTypes, row.priceType);
     addUnique(item.sourceSheets, row.sourceSheet);
   }
 
-  return [...grouped.values()].map((item) => ({
-    ...item,
-    taskName: item.taskNames[0] || "",
-    cpa: item.conversions > 0 ? item.spend / item.conversions : null,
-    retentionRate: item.retentionConversions > 0 ? item.nextRetained / item.retentionConversions : null,
-    retentionAnomaly: item.nextRetained > item.retentionConversions,
-  }));
+  return [...grouped.values()].map((item) => {
+    const supplierGroup = aggregateSupplierGroup(item.supplierGroups);
+    return {
+      ...item,
+      taskName: item.taskNames[0] || "",
+      supplierGroup,
+      supplierEvidence: item.supplierEvidenceItems.join("；"),
+      supplierConfidence: supplierGroup === "混合"
+        ? "待核验"
+        : [...item.supplierConfidences].sort((a, b) => (CONFIDENCE_RANK[a] ?? 9) - (CONFIDENCE_RANK[b] ?? 9))[0] || "待核验",
+      priceType: aggregatePriceType(item.priceTypes),
+      cpa: item.conversions > 0 ? item.spend / item.conversions : null,
+      retentionRate: item.retentionConversions > 0 ? item.nextRetained / item.retentionConversions : null,
+      retentionAnomaly: item.nextRetained > item.retentionConversions,
+    };
+  });
 }
 
 export function inferCreativeFeatures(title = "") {
@@ -162,6 +190,59 @@ export function generateNextWeekBriefs(materials, directionSummaries, weeklyCapa
       referenceIds: references.map((item) => item.materialId),
     };
   });
+}
+
+export function buildSupplierPlan(materials = [], briefs = []) {
+  const totalCapacity = briefs.reduce((total, item) => total + Math.max(0, Math.round(finiteNumber(item.quantity))), 0);
+  const excluded = materials.filter((item) => item.priceType === "一口价原素材");
+  const retainedSecondEdits = materials.filter((item) => item.priceType === "一口价二剪");
+  const eligible = materials.filter((item) => item.priceType !== "一口价原素材" && TARGET_SUPPLIERS.includes(item.supplierGroup));
+  const overallMetrics = supplierMetrics(eligible);
+  const directions = briefs.map((brief) => {
+    const directionMaterials = eligible.filter((item) => item.direction === brief.direction);
+    const directionMetrics = supplierMetrics(directionMaterials);
+    const directionSample = directionMetrics.reduce((total, item) => total + item.materialCount, 0);
+    const directionConversions = directionMetrics.reduce((total, item) => total + item.conversions, 0);
+    const usesFallback = directionSample < 5 || directionConversions < 5;
+    const metrics = usesFallback ? overallMetrics : directionMetrics;
+    const split = supplierShare(metrics, usesFallback);
+    const youjuQuantity = Math.round(brief.quantity * split.youjuShare);
+    const heyeQuantity = Math.max(0, brief.quantity - youjuQuantity);
+    const allocation = [
+      supplierAllocation("优矩", youjuQuantity, brief.quantity, metrics),
+      supplierAllocation("禾也/禾悦", heyeQuantity, brief.quantity, metrics),
+    ];
+    return {
+      direction: brief.direction,
+      quantity: brief.quantity,
+      allocation,
+      confidence: allocationConfidence(directionMetrics, usesFallback),
+      usesFallback,
+      evidenceMaterialCount: directionSample,
+      evidenceConversions: directionConversions,
+      reason: supplierReason(directionMetrics, overallMetrics, allocation, usesFallback),
+    };
+  });
+
+  const suppliers = TARGET_SUPPLIERS.map((supplier) => {
+    const quantity = directions.reduce((total, item) => total + (item.allocation.find((entry) => entry.supplier === supplier)?.quantity || 0), 0);
+    return { ...overallMetrics.find((item) => item.supplier === supplier), quantity, share: totalCapacity > 0 ? quantity / totalCapacity : 0 };
+  });
+  const nonOriginal = materials.filter((item) => item.priceType !== "一口价原素材");
+
+  return {
+    totalCapacity,
+    suppliers,
+    directions,
+    excludedOriginalPriceCount: excluded.length,
+    excludedOriginalPriceSpend: sum(excluded, "spend"),
+    retainedSecondEditCount: retainedSecondEdits.length,
+    retainedSecondEditSpend: sum(retainedSecondEdits, "spend"),
+    identifiableCount: eligible.length,
+    unresolvedCount: nonOriginal.filter((item) => item.supplierGroup === "待识别").length,
+    mixedCount: nonOriginal.filter((item) => item.supplierGroup === "混合").length,
+    otherSupplierCount: nonOriginal.filter((item) => item.supplierGroup === "其他历史服务商").length,
+  };
 }
 
 function enrichCreativeFeatures(item) {
@@ -350,6 +431,111 @@ function testRecommendation(strategy) {
   if (strategy === "验证高效潜力") return "同一脚本做2-3个开场变体，小批量验证是否能扩大消耗";
   return "每条只测试一个新变量，并保留已验证的产品承接方式作为对照";
 }
+
+function supplierMetrics(materials) {
+  return TARGET_SUPPLIERS.map((supplier) => {
+    const items = materials.filter((item) => item.supplierGroup === supplier);
+    const validRetention = items.filter((item) => !item.retentionAnomaly);
+    const spend = sum(items, "spend");
+    const conversions = sum(items, "conversions");
+    const retained = sum(validRetention, "nextRetained");
+    const retentionConversions = sum(validRetention, "retentionConversions");
+    return {
+      supplier,
+      materialCount: items.length,
+      spend,
+      conversions,
+      cpa: conversions > 0 ? spend / conversions : null,
+      retentionRate: retentionConversions > 0 ? retained / retentionConversions : null,
+      winnerCount: items.filter((item) => item.classification === "跑量优质").length,
+      directCount: items.filter((item) => item.supplierConfidence === "高").length,
+    };
+  });
+}
+
+function supplierShare(metrics, conservative) {
+  const [youju, heye] = TARGET_SUPPLIERS.map((supplier) => metrics.find((item) => item.supplier === supplier) || emptySupplierMetric(supplier));
+  const totalMaterials = youju.materialCount + heye.materialCount;
+  const totalConversions = youju.conversions + heye.conversions;
+  const materialShare = smoothedShare(youju.materialCount, heye.materialCount);
+  const conversionShare = smoothedShare(youju.conversions, heye.conversions);
+  const efficiencyShare = inverseMetricShare(youju.cpa, heye.cpa);
+  const retentionShare = directMetricShare(youju.retentionRate, heye.retentionRate);
+  let share = materialShare * .25 + conversionShare * .35 + efficiencyShare * .3 + retentionShare * .1;
+
+  if (totalMaterials === 0 || totalConversions === 0) share = .5;
+  const oneSideWeak = youju.materialCount < 3 || heye.materialCount < 3 || youju.conversions < 5 || heye.conversions < 5;
+  const floor = conservative ? .4 : oneSideWeak ? .1 : .2;
+  const ceiling = 1 - floor;
+  return { youjuShare: clamp(share, floor, ceiling) };
+}
+
+function supplierAllocation(supplier, quantity, total, metrics) {
+  const metric = metrics.find((item) => item.supplier === supplier) || emptySupplierMetric(supplier);
+  return { ...metric, quantity, share: total > 0 ? quantity / total : 0 };
+}
+
+function supplierReason(directionMetrics, overallMetrics, allocation, usesFallback) {
+  const evidence = usesFallback ? overallMetrics : directionMetrics;
+  const [youju, heye] = TARGET_SUPPLIERS.map((supplier) => evidence.find((item) => item.supplier === supplier) || emptySupplierMetric(supplier));
+  const [youjuAllocation, heyeAllocation] = TARGET_SUPPLIERS.map((supplier) => allocation.find((item) => item.supplier === supplier));
+  const scope = usesFallback ? "该创意方向的服务商样本不足，暂用全盘数据保守分配" : `该方向共有${formatNumber(youju.materialCount + heye.materialCount)}条可归因素材`;
+  const comparison = `优矩${formatNumber(youju.conversions)}个转化、成本${formatMoney(youju.cpa)}、次留${formatPercent(youju.retentionRate)}；禾也/禾悦${formatNumber(heye.conversions)}个转化、成本${formatMoney(heye.cpa)}、次留${formatPercent(heye.retentionRate)}`;
+  const leader = youjuAllocation.quantity === heyeAllocation.quantity
+    ? "两家先按接近均分建立对照"
+    : `${youjuAllocation.quantity > heyeAllocation.quantity ? "优矩" : "禾也/禾悦"}获得更多验证量，另一家保留对照样本`;
+  return `${scope}；${comparison}。${leader}，下周按同一Brief与变量口径对比。`;
+}
+
+function allocationConfidence(directionMetrics, usesFallback) {
+  if (usesFallback) return "低";
+  const totalMaterials = directionMetrics.reduce((total, item) => total + item.materialCount, 0);
+  const totalConversions = directionMetrics.reduce((total, item) => total + item.conversions, 0);
+  const direct = directionMetrics.reduce((total, item) => total + item.directCount, 0);
+  if (totalConversions >= 20 && totalMaterials >= 10 && direct / Math.max(1, totalMaterials) >= .7) return "高";
+  return "中";
+}
+
+function emptySupplierMetric(supplier) {
+  return { supplier, materialCount: 0, spend: 0, conversions: 0, cpa: null, retentionRate: null, winnerCount: 0, directCount: 0 };
+}
+
+function smoothedShare(left, right) {
+  return (finiteNumber(left) + 1) / (finiteNumber(left) + finiteNumber(right) + 2);
+}
+
+function inverseMetricShare(left, right) {
+  if (!Number.isFinite(left) && !Number.isFinite(right)) return .5;
+  if (!Number.isFinite(left)) return .1;
+  if (!Number.isFinite(right)) return .9;
+  const leftEfficiency = 1 / Math.max(.01, left);
+  const rightEfficiency = 1 / Math.max(.01, right);
+  return leftEfficiency / (leftEfficiency + rightEfficiency);
+}
+
+function directMetricShare(left, right) {
+  if (!Number.isFinite(left) && !Number.isFinite(right)) return .5;
+  if (!Number.isFinite(left)) return .25;
+  if (!Number.isFinite(right)) return .75;
+  return left + right > 0 ? left / (left + right) : .5;
+}
+
+function aggregateSupplierGroup(groups) {
+  const meaningful = [...new Set(groups.filter(Boolean))];
+  if (meaningful.length === 1) return meaningful[0];
+  if (!meaningful.length) return "待识别";
+  return "混合";
+}
+
+function aggregatePriceType(types) {
+  const meaningful = [...new Set(types.filter(Boolean))];
+  if (meaningful.length === 1) return meaningful[0];
+  if (meaningful.includes("一口价二剪")) return "一口价二剪";
+  if (meaningful.includes("一口价原素材")) return "一口价原素材";
+  return "常规素材";
+}
+
+function clamp(value, minimum, maximum) { return Math.min(maximum, Math.max(minimum, value)); }
 
 function buildWarnings(materials) {
   const warnings = [];
