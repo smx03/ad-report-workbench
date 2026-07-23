@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { aggregateMaterialRows, buildMaterialReview, inferCreativeFeatures } from "./public/material-review-engine.js";
+import { aggregateMaterialRows, buildMaterialReview, buildSupplierPlan, inferCreativeFeatures } from "./public/material-review-engine.js";
+import { inferPriceType, normalizeSupplierGroup } from "./public/material-review-reader.js";
 import { buildCpaSeries, directionSpendBreakdown, paginateItems, paginationTokens } from "./public/material-review-view.js";
 
 const rows = [
@@ -38,6 +39,7 @@ assert.equal(review.materials.find((item) => item.materialId === "75643783441895
 assert.equal(review.materials.find((item) => item.materialId === "7648912854939910178").classification, "数据不足");
 assert.equal(review.briefs.reduce((sum, item) => sum + item.quantity, 0), 17);
 assert.ok(review.briefs.every((item) => item.referenceIds.every((id) => typeof id === "string")));
+assert.ok(review.briefs.every((item) => item.supplierAllocation.allocation.reduce((sum, entry) => sum + entry.quantity, 0) === item.quantity));
 
 const page = paginateItems(Array.from({ length: 123 }, (_, index) => index + 1), 3, 50);
 assert.deepEqual({ page: page.page, totalPages: page.totalPages, startIndex: page.startIndex, endIndex: page.endIndex, first: page.items[0], last: page.items.at(-1) }, { page: 3, totalPages: 3, startIndex: 100, endIndex: 123, first: 101, last: 123 });
@@ -61,6 +63,26 @@ const anomalyReview = buildMaterialReview([
 assert.equal(anomalyReview.materials[0].retentionAnomaly, true);
 assert.ok(anomalyReview.warnings.some((warning) => warning.includes("次留数大于")));
 
+assert.equal(normalizeSupplierGroup("优矩-星广联投"), "优矩");
+assert.equal(normalizeSupplierGroup("禾也科技"), "禾也/禾悦");
+assert.equal(normalizeSupplierGroup("优矩、禾也"), "混合");
+assert.equal(normalizeSupplierGroup("四盛传媒"), "其他历史服务商");
+assert.equal(inferPriceType("一口价", "共享素材"), "一口价原素材");
+assert.equal(inferPriceType("一口价-二剪", "一口价二剪测试"), "一口价二剪");
+
+const supplierMaterials = [
+  supplierMaterial("优矩", 1200, 60, 24, "常规素材", "户外建造"),
+  supplierMaterial("优矩", 800, 40, 16, "一口价二剪", "户外建造"),
+  supplierMaterial("禾也/禾悦", 900, 30, 15, "常规素材", "户外建造"),
+  supplierMaterial("优矩", 5000, 100, 30, "一口价原素材", "户外建造"),
+];
+const supplierPlan = buildSupplierPlan(supplierMaterials, [{ direction: "户外建造", quantity: 11 }]);
+assert.equal(supplierPlan.excludedOriginalPriceCount, 1);
+assert.equal(supplierPlan.retainedSecondEditCount, 1);
+assert.equal(supplierPlan.suppliers.reduce((sum, item) => sum + item.quantity, 0), 11);
+assert.equal(supplierPlan.directions[0].allocation.reduce((sum, item) => sum + item.quantity, 0), 11);
+assert.ok(supplierPlan.suppliers.find((item) => item.supplier === "优矩").quantity > supplierPlan.suppliers.find((item) => item.supplier === "禾也/禾悦").quantity);
+
 console.log("素材周度复盘单元测试通过");
 
 function row(materialId, placement, spend, conversions, nextRetained, title, taskId) {
@@ -77,5 +99,20 @@ function row(materialId, placement, spend, conversions, nextRetained, title, tas
     taskType: "内容",
     provider: "服务商",
     sourceSheet: `${placement}素材跑出情况`,
+  };
+}
+
+function supplierMaterial(supplierGroup, spend, conversions, nextRetained, priceType, direction) {
+  return {
+    supplierGroup,
+    spend,
+    conversions,
+    nextRetained,
+    retentionConversions: conversions,
+    retentionAnomaly: false,
+    priceType,
+    direction,
+    classification: "跑量优质",
+    supplierConfidence: "高",
   };
 }

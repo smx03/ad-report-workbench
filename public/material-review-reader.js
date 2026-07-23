@@ -12,6 +12,11 @@ export async function readMaterialWorkbook(input) {
   const sheets = workbookSheets(workbookDoc, relationDoc);
   const taskSheet = sheets.find((sheet) => sheet.name === "任务") || sheets.find((sheet) => /任务/.test(sheet.name));
   const taskMap = taskSheet ? await readTaskMap(zip, taskSheet, sharedStrings) : new Map();
+  const providerSheet = sheets.find((sheet) => sheet.name === "星广-抖音精选")
+    || sheets.find((sheet) => /星广.*抖音精选/.test(sheet.name));
+  const providerMaps = providerSheet
+    ? await readProviderMaps(zip, providerSheet, sharedStrings)
+    : { byMaterial: new Map(), byTask: new Map() };
 
   let candidates = sheets.filter((sheet) => /内广|外广|素材.*跑出|跑出.*素材/.test(sheet.name));
   if (!candidates.length) candidates = sheets;
@@ -24,7 +29,7 @@ export async function readMaterialWorkbook(input) {
   }
   if (!materialSheets.length) throw new Error("未找到素材数据页。需要包含“视频素材ID、消耗、转化数”等表头。");
 
-  const rows = materialSheets.flatMap((sheet) => materialRows(sheet, taskMap));
+  const rows = materialSheets.flatMap((sheet) => materialRows(sheet, taskMap, providerMaps));
   if (!rows.length) throw new Error("已识别素材数据页，但没有读取到有效素材记录。");
   return {
     rows,
@@ -67,6 +72,41 @@ async function readTaskMap(zip, sheet, sharedStrings) {
   return result;
 }
 
+async function readProviderMaps(zip, sheet, sharedStrings) {
+  const parsed = await readSheetRows(zip, sheet, sharedStrings);
+  const columns = headerColumns(parsed.headers);
+  const materialColumn = columns.get("素材ID");
+  const taskColumn = columns.get("任务ID");
+  const providerColumn = columns.get("服务商名称") ?? columns.get("服务商");
+  if (!materialColumn || !providerColumn) return { byMaterial: new Map(), byTask: new Map() };
+
+  const byMaterial = new Map();
+  const taskProviders = new Map();
+  for (const row of parsed.rows) {
+    const materialId = textValue(row[materialColumn]);
+    const taskId = textValue(row[taskColumn]);
+    const provider = textValue(row[providerColumn]);
+    const supplierGroup = normalizeSupplierGroup(provider);
+    if (!materialId || !provider) continue;
+    if (!byMaterial.has(materialId)) byMaterial.set(materialId, { supplierGroup, provider });
+    if (taskId) {
+      if (!taskProviders.has(taskId)) taskProviders.set(taskId, new Map());
+      taskProviders.get(taskId).set(supplierGroup, provider);
+    }
+  }
+
+  const byTask = new Map();
+  for (const [taskId, providers] of taskProviders) {
+    if (providers.size === 1) {
+      const [supplierGroup, provider] = providers.entries().next().value;
+      byTask.set(taskId, { supplierGroup, provider, mixed: false });
+    } else {
+      byTask.set(taskId, { supplierGroup: "混合", provider: [...providers.values()].join("、"), mixed: true });
+    }
+  }
+  return { byMaterial, byTask };
+}
+
 async function readSheetRows(zip, sheet, sharedStrings) {
   const document = await readXml(zip, sheet.path);
   const xmlRows = [...elements(document, "row")];
@@ -94,7 +134,7 @@ function rowValues(rowNode, sharedStrings) {
   return result;
 }
 
-function materialRows(sheet, taskMap) {
+function materialRows(sheet, taskMap, providerMaps) {
   const columns = headerColumns(sheet.headers);
   const placement = inferPlacement(sheet.name);
   return sheet.rows.map((row) => {
@@ -102,12 +142,14 @@ function materialRows(sheet, taskMap) {
     if (!materialId) return null;
     const taskId = textValue(row[columns.get("星广主任务ID") ?? columns.get("任务id")]);
     const task = taskMap.get(taskId) || {};
+    const taskName = textValue(row[columns.get("任务名称")]) || task.taskName || "";
+    const supplier = resolveSupplier(materialId, taskId, task, taskName, providerMaps);
     return {
       materialId,
       videoUrl: textValue(row[columns.get("视频链接")]),
       title: textValue(row[columns.get("视频标题") ?? columns.get("抖音视频标题")]),
       taskId,
-      taskName: textValue(row[columns.get("任务名称")]) || task.taskName || "",
+      taskName,
       placement,
       spend: numberValue(row[columns.get("消耗")]),
       conversions: numberValue(row[columns.get("转化数")]),
@@ -116,9 +158,71 @@ function materialRows(sheet, taskMap) {
       taskType: task.taskType || "",
       provider: task.provider || "",
       channel: task.channel || "",
+      supplierGroup: supplier.supplierGroup,
+      supplierEvidence: supplier.supplierEvidence,
+      supplierConfidence: supplier.supplierConfidence,
+      priceType: inferPriceType(task.taskType, taskName),
       sourceSheet: sheet.name,
     };
   }).filter(Boolean);
+}
+
+function resolveSupplier(materialId, taskId, task, taskName, providerMaps) {
+  const exact = providerMaps.byMaterial.get(materialId);
+  if (exact) return {
+    supplierGroup: exact.supplierGroup,
+    supplierEvidence: `星广素材库按素材ID精确匹配：${exact.provider}`,
+    supplierConfidence: "高",
+  };
+
+  const taskProvider = textValue(task.provider);
+  if (taskProvider) return {
+    supplierGroup: normalizeSupplierGroup(taskProvider),
+    supplierEvidence: `任务表服务商字段：${taskProvider}`,
+    supplierConfidence: taskProvider.includes("混合") ? "待核验" : "高",
+  };
+
+  const historical = providerMaps.byTask.get(taskId);
+  if (historical) return {
+    supplierGroup: historical.supplierGroup,
+    supplierEvidence: historical.mixed
+      ? `该任务ID历史出现多家服务商：${historical.provider}`
+      : `该任务ID在星广素材库仅出现于：${historical.provider}`,
+    supplierConfidence: historical.mixed ? "待核验" : "中",
+  };
+
+  const inferred = inferSupplierFromTaskName(taskName);
+  if (inferred) return {
+    supplierGroup: inferred,
+    supplierEvidence: `任务名称缩写推断：${taskName}`,
+    supplierConfidence: "低",
+  };
+  return { supplierGroup: "待识别", supplierEvidence: "素材ID、任务表和历史任务均无单一服务商证据", supplierConfidence: "待核验" };
+}
+
+export function normalizeSupplierGroup(value) {
+  const provider = textValue(value);
+  if (!provider) return "待识别";
+  if (/优矩/i.test(provider) && /禾也|禾悦/i.test(provider)) return "混合";
+  if (/优矩/i.test(provider)) return "优矩";
+  if (/禾也|禾悦/i.test(provider)) return "禾也/禾悦";
+  if (/混合/i.test(provider)) return "混合";
+  return "其他历史服务商";
+}
+
+export function inferPriceType(taskType = "", taskName = "") {
+  const source = `${textValue(taskType)} ${textValue(taskName)}`;
+  if (/一口价\s*[-_—]?二剪|一口价二剪|二剪.*一口价/i.test(source)) return "一口价二剪";
+  if (/一口价/i.test(source)) return "一口价原素材";
+  return "常规素材";
+}
+
+function inferSupplierFromTaskName(taskName) {
+  const source = textValue(taskName);
+  if (!source) return null;
+  if (/禾也|禾悦|(?:^|[-_【\s])HY(?:[-_】\s]|$)/i.test(source)) return "禾也/禾悦";
+  if (/UJU[-_x]UJU/i.test(source)) return "优矩";
+  return null;
 }
 
 function isMaterialHeaders(headers) {
